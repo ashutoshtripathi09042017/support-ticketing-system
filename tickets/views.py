@@ -17,6 +17,8 @@ from .serializers import (
 )
 from .permissions import IsSupervisor, IsAssigneeOrCollaboratorOrSupervisor
 
+from django.contrib.auth import authenticate, login, logout
+from rest_framework.views import APIView
 
 class TicketViewSet(viewsets.ModelViewSet):
     serializer_class = TicketSerializer
@@ -205,3 +207,36 @@ class SlaAlertViewSet(viewsets.ModelViewSet):
         alert.acknowledged_by = request.user
         alert.save()
         return Response({"status": "acknowledged"}, status=status.HTTP_200_OK)
+
+
+
+#----------------------------- Login API Endpoint -----------------------------
+
+class LoginView(APIView):
+    permission_classes = []  # Public endpoint
+
+    def post(self, request):
+        username = request.data.get('username')
+        password = request.data.get('password')
+        user = authenticate(username=username, password=password)
+
+        if user:
+            login(request, user)
+            return Response(UserSerializer(user).data, status=status.HTTP_200_OK)
+        return Response({"detail": "Invalid credentials"}, status=status.HTTP_401_UNAUTHORIZED)
+
+
+class CurrentUserView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        return Response(UserSerializer(request.user).data)
+
+
+class LogoutView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request):
+        logout(request)
+        return Response({"detail": "Logged out successfully"}, status=status.HTTP_200_OK)
+    
