@@ -4,9 +4,9 @@ from django.utils import timezone
 from django.http import HttpResponse
 from django.db import models
 from rest_framework import viewsets, status, generics
-from rest_framework.decorators import action
+from rest_framework.decorators import action, api_view, permission_classes
 from rest_framework.response import Response
-from rest_framework.permissions import IsAuthenticated
+from rest_framework.permissions import IsAuthenticated, AllowAny
 from django_filters.rest_framework import DjangoFilterBackend
 from rest_framework.filters import SearchFilter, OrderingFilter
 
@@ -180,17 +180,25 @@ class TicketViewSet(viewsets.ModelViewSet):
 
     @action(detail=False, methods=['get'])
     def export_csv(self, request):
-        """Exports currently filtered queue as CSV."""
-        queryset = self.filter_queryset(self.get_queryset())
         response = HttpResponse(content_type='text/csv')
-        response['Content-Disposition'] = 'attachment; filename="tickets_export.csv"'
+        response['Content-Disposition'] = 'attachment; filename="tickets.csv"'
+        response['Access-Control-Expose-Headers'] = 'Content-Disposition'
 
         writer = csv.writer(response)
         writer.writerow(['ID', 'Subject', 'Status', 'Priority', 'Category', 'Assignee', 'Created At'])
 
-        for t in queryset:
-            assignee = t.primary_assignee.username if t.primary_assignee else 'Unassigned'
-            writer.writerow([t.id, t.subject, t.status, t.priority, t.category, assignee, t.created_at])
+        queryset = self.filter_queryset(self.get_queryset())
+        for ticket in queryset:
+            assignee = ticket.primary_assignee.username if ticket.primary_assignee else 'Unassigned'
+            writer.writerow([
+                ticket.id,
+                ticket.subject,
+                ticket.status,
+                ticket.priority,
+                ticket.category,
+                assignee,
+                ticket.created_at.strftime('%Y-%m-%d %H:%M:%S')
+            ])
 
         return response
 
@@ -218,10 +226,12 @@ class LoginView(APIView):
     def post(self, request):
         username = request.data.get('username')
         password = request.data.get('password')
-        user = authenticate(username=username, password=password)
+        user = authenticate(request, username=username, password=password)
 
         if user:
             login(request, user)
+            # Explicitly save session to ensure cookie is sent
+            request.session.save()
             return Response(UserSerializer(user).data, status=status.HTTP_200_OK)
         return Response({"detail": "Invalid credentials"}, status=status.HTTP_401_UNAUTHORIZED)
 

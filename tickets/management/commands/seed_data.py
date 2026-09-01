@@ -10,12 +10,15 @@ class Command(BaseCommand):
     def handle(self, *args, **kwargs):
         self.stdout.write("Seeding data...")
 
-        # Create Supervisor
+        # Create Supervisor (with Admin access)
         sup, created = User.objects.get_or_create(username='supervisor', email='supervisor@example.com')
-        if created:
-            sup.set_password('Password123')
-            sup.save()
-            UserProfile.objects.create(user=sup, role='SUPERVISOR')
+        sup.set_password('Password123')
+        sup.is_staff = True
+        sup.is_superuser = True
+        sup.save()
+
+        if not hasattr(sup, 'profile'):
+          UserProfile.objects.create(user=sup, role='SUPERVISOR')
 
         # Create Agents
         agent1, created = User.objects.get_or_create(username='agent1', email='agent1@example.com')
