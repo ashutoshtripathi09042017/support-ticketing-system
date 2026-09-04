@@ -1,3 +1,4 @@
+import dj_database_url
 """
 Django settings for backend project.
 
@@ -10,7 +11,7 @@ For the full list of settings and their values, see
 https://docs.djangoproject.com/en/6.1/ref/settings/
 """
 import os
-import dj_database_url
+
 from pathlib import Path
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
@@ -140,16 +141,17 @@ STATICFILES_STORAGE = 'whitenoise.storage.CompressedManifestStaticFilesStorage'
 FRONTEND_URL = os.environ.get('FRONTEND_URL', 'http://localhost:5173')
 
 CORS_ALLOWED_ORIGINS = [
-    FRONTEND_URL,
-    "http://localhost:5173",
+    "https://support-ticketing-system-rouge.vercel.app",
 ]
+
 CSRF_TRUSTED_ORIGINS = [
-    FRONTEND_URL,
-    "http://localhost:5173",
+    "https://support-ticketing-system-rouge.vercel.app",
+    "https://support-tickets-backend-4px7.onrender.com",
 ]
+
 CORS_ALLOW_CREDENTIALS = True
 
-# Production Cross-Site Session Settings
+# Production Session Cookie Policies for Cross-Domain Authentication
 SESSION_COOKIE_SAMESITE = 'None'
 SESSION_COOKIE_SECURE = True
 CSRF_COOKIE_SAMESITE = 'None'
