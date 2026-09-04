@@ -1,7 +1,9 @@
 import axios from 'axios';
 
+const API_URL = import.meta.env.VITE_API_URL || 'https://support-tickets-backend-4px7.onrender.com/api/';
+
 const api = axios.create({
-  baseURL: 'http://localhost:8000/api/', // Changed from 127.0.0.1 to localhost
+  baseURL: API_URL,
   withCredentials: true,
   headers: {
     'Content-Type': 'application/json',
