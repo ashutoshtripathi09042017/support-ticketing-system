@@ -4,8 +4,10 @@ Fill this in and commit it. This is the first file we open.
 
 ## Links
 
-- **GitHub repository:** https://github.com/your-username/support-ticketing-system
-- **Live application:** http://localhost:5173 (Runs locally)
+- **GitHub repository:** https://github.com/ashutoshtripathi09042017/support-ticketing-system.git
+- **Live application:** 
+Live App (Vercel): [https://support-ticketing-system-rouge.vercel.app](https://support-ticketing-system-rouge.vercel.app)
+Backend API (Render): [https://support-tickets-backend-4px7.onrender.com](https://support-tickets-backend-4px7.onrender.com)
 
 ## Notes for the reviewer
 
