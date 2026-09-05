@@ -8,24 +8,23 @@ export const AuthProvider = ({ children }) => {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    // Refresh par logged in user fetch karein
-    api.get('auth/me/')
+    api.get('me/')
       .then(res => setUser(res.data))
       .catch(() => setUser(null))
       .finally(() => setLoading(false));
   }, []);
 
   const login = async (username, password) => {
-  // First fetch CSRF token cookie from backend
-  await api.get('csrf/'); 
-  
-  const response = await api.post('login/', { username, password });
-  setUser(response.data);
-  return response.data;
-};
+    // Fetch CSRF token cookie from backend
+    await api.get('csrf/'); 
+    
+    const response = await api.post('login/', { username, password });
+    setUser(response.data);
+    return response.data;
+  };
 
   const logout = async () => {
-    await api.post('auth/logout/');
+    await api.post('logout/');
     setUser(null);
   };
 
