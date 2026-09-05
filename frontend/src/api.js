@@ -1,9 +1,7 @@
 import axios from 'axios';
 
-const API_URL = import.meta.env.VITE_API_URL || 'https://support-tickets-backend-4px7.onrender.com/api/';
-
 const api = axios.create({
-  baseURL: API_URL,
+  baseURL: 'https://support-tickets-backend-4px7.onrender.com/api/',
   withCredentials: true,
   headers: {
     'Content-Type': 'application/json',
