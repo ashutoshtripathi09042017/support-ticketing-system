@@ -80,6 +80,11 @@ STATICFILES_STORAGE = 'whitenoise.storage.CompressedManifestStaticFilesStorage'
 # Cross-Domain CORS & Session Cookie Settings
 CORS_ALLOW_CREDENTIALS = True
 
+# Wildcard regex matching for all Vercel deployments & preview URLs
+CORS_ALLOWED_ORIGIN_REGEXES = [
+    r"^https://.*\.vercel\.app$",
+]
+
 CORS_ALLOWED_ORIGINS = [
     "https://support-ticketing-system-rouge.vercel.app",
     "http://localhost:5173",
@@ -87,6 +92,7 @@ CORS_ALLOWED_ORIGINS = [
 ]
 
 CSRF_TRUSTED_ORIGINS = [
+    "https://*.vercel.app",
     "https://support-ticketing-system-rouge.vercel.app",
     "https://support-tickets-backend-4px7.onrender.com",
     "http://localhost:5173",
