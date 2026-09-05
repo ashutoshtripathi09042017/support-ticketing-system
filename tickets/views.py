@@ -107,7 +107,7 @@ class TicketViewSet(viewsets.ModelViewSet):
             
         return response
 
-    @action(detail=True, methods=['post'])
+    @action(detail=True, methods=['post'], permission_classes=[IsAuthenticated])
     def add_reply(self, request, pk=None):
         ticket = self.get_object()
         message = request.data.get('message')
@@ -117,7 +117,10 @@ class TicketViewSet(viewsets.ModelViewSet):
             return Response({"detail": "Message body is required."}, status=status.HTTP_400_BAD_REQUEST)
 
         reply = Reply.objects.create(
-            ticket=ticket, author=request.user, message=message, is_internal=is_internal
+            ticket=ticket, 
+            author=request.user, 
+            message=message, 
+            is_internal=is_internal
         )
 
         # Auto transition from Pending -> Open on customer/agent response
@@ -130,8 +133,10 @@ class TicketViewSet(viewsets.ModelViewSet):
 
         # Record in Immutable History
         TicketHistory.objects.create(
-            ticket=ticket, actor=request.user,
-            action='REPLY_ADDED', new_value='Internal Note' if is_internal else 'Customer Reply'
+            ticket=ticket, 
+            actor=request.user,
+            action='REPLY_ADDED', 
+            new_value='Internal Note' if is_internal else 'Customer Reply'
         )
 
         return Response(ReplySerializer(reply).data, status=status.HTTP_201_CREATED)
