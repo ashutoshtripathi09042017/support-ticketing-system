@@ -48,7 +48,7 @@ export default function Login() {
       <div style={{ marginTop: '15px', fontSize: '12px', color: '#666' }}>
         <strong>Demo Accounts:</strong><br />
         Supervisor: <code>supervisor</code> / <code>Ashu@2228</code><br />
-        Agent: <code>agent1</code> / <code>Ashu@2228</code>
+        Agent: <code>agent1</code> / <code>Ashu@2228</code><br />
         Agent: <code>agent2</code> / <code>Ashu@2228</code>
       </div>
     </div>

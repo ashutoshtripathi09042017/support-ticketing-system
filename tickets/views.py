@@ -274,7 +274,6 @@ class CurrentUserView(APIView):
 
 @method_decorator(csrf_exempt, name='dispatch')
 class LogoutView(APIView):
-    permission_classes = [IsAuthenticated]
 
     def post(self, request):
         logout(request)
