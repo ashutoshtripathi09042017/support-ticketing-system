@@ -24,10 +24,17 @@ export const AuthProvider = ({ children }) => {
   };
 
   const logout = async () => {
-    await api.post('logout/');
-    setUser(null);
+    try {
+      await api.get('csrf/'); // Fetches fresh CSRF token before post
+      await api.post('logout/');
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setUser(null);
+    }
   };
 
+  
   return (
     <AuthContext.Provider value={{ user, login, logout, loading }}>
       {children}

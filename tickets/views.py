@@ -1,6 +1,7 @@
 import csv
 from datetime import timedelta
 from django.utils import timezone
+from django.utils.decorators import method_decorator
 from django.http import HttpResponse, JsonResponse
 from django.db import models
 from rest_framework import viewsets, status, generics
@@ -271,6 +272,7 @@ class CurrentUserView(APIView):
         })
 
 
+@method_decorator(csrf_exempt, name='dispatch')
 class LogoutView(APIView):
     permission_classes = [IsAuthenticated]
 
