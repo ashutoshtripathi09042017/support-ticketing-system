@@ -22,7 +22,7 @@ from .serializers import (
     SlaAlertSerializer, UserSerializer
 )
 
-
+@method_decorator(csrf_exempt, name='dispatch')
 class TicketViewSet(viewsets.ModelViewSet):
     serializer_class = TicketSerializer
     permission_classes = [IsAuthenticated]
