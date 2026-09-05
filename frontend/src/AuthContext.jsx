@@ -16,10 +16,13 @@ export const AuthProvider = ({ children }) => {
   }, []);
 
   const login = async (username, password) => {
-    const res = await api.post('auth/login/', { username, password });
-    setUser(res.data);
-    return res.data;
-  };
+  // First fetch CSRF token cookie from backend
+  await api.get('csrf/'); 
+  
+  const response = await api.post('login/', { username, password });
+  setUser(response.data);
+  return response.data;
+};
 
   const logout = async () => {
     await api.post('auth/logout/');

@@ -1,7 +1,7 @@
 import csv
 from datetime import timedelta
 from django.utils import timezone
-from django.http import HttpResponse
+from django.http import HttpResponse, JsonResponse
 from django.db import models
 from rest_framework import viewsets, status, generics
 from rest_framework.decorators import action, api_view, permission_classes
@@ -19,6 +19,9 @@ from .permissions import IsSupervisor, IsAssigneeOrCollaboratorOrSupervisor
 
 from django.contrib.auth import authenticate, login, logout
 from rest_framework.views import APIView
+from django.views.decorators.csrf import csrf_exempt, ensure_csrf_cookie
+import json
+
 
 class TicketViewSet(viewsets.ModelViewSet):
     serializer_class = TicketSerializer
@@ -69,7 +72,7 @@ class TicketViewSet(viewsets.ModelViewSet):
                     status=status.HTTP_403_FORBIDDEN
                 )
 
-        # Rule 4: Closed Ticket Reopen Window Check (e.g., 24 hours)
+        # Rule 4: Closed Ticket Reopen Window Check (24 hours)
         if old_status == 'CLOSED' and new_status != 'CLOSED':
             if instance.closed_at and (timezone.now() - instance.closed_at) > timedelta(hours=24):
                 return Response(
@@ -217,30 +220,55 @@ class SlaAlertViewSet(viewsets.ModelViewSet):
         return Response({"status": "acknowledged"}, status=status.HTTP_200_OK)
 
 
+# ----------------------------- Authentication Endpoints -----------------------------
 
-#----------------------------- Login API Endpoint -----------------------------
+@ensure_csrf_cookie
+@api_view(['GET'])
+@permission_classes([AllowAny])
+def get_csrf_token(request):
+    """Sets CSRF cookie for cross-domain requests."""
+    return Response({'detail': 'CSRF cookie set'})
 
-class LoginView(APIView):
-    permission_classes = []  # Public endpoint
 
-    def post(self, request):
-        username = request.data.get('username')
-        password = request.data.get('password')
-        user = authenticate(request, username=username, password=password)
-
-        if user:
-            login(request, user)
-            # Explicitly save session to ensure cookie is sent
-            request.session.save()
-            return Response(UserSerializer(user).data, status=status.HTTP_200_OK)
-        return Response({"detail": "Invalid credentials"}, status=status.HTTP_401_UNAUTHORIZED)
+@csrf_exempt
+def login_view(request):
+    if request.method == 'POST':
+        try:
+            data = json.loads(request.body)
+            username = data.get('username')
+            password = data.get('password')
+            
+            user = authenticate(request, username=username, password=password)
+            
+            if user is not None:
+                login(request, user)
+                role = user.profile.role if hasattr(user, 'profile') else 'SUPERVISOR'
+                return JsonResponse({
+                    'id': user.id,
+                    'username': user.username,
+                    'email': user.email,
+                    'role': role
+                })
+            else:
+                return JsonResponse({'error': 'Invalid credentials'}, status=400)
+        except Exception as e:
+            return JsonResponse({'error': str(e)}, status=400)
+            
+    return JsonResponse({'error': 'POST request required'}, status=405)
 
 
 class CurrentUserView(APIView):
     permission_classes = [IsAuthenticated]
 
     def get(self, request):
-        return Response(UserSerializer(request.user).data)
+        user = request.user
+        role = user.profile.role if hasattr(user, 'profile') else 'SUPERVISOR'
+        return Response({
+            'id': user.id,
+            'username': user.username,
+            'email': user.email,
+            'role': role
+        })
 
 
 class LogoutView(APIView):
@@ -249,4 +277,3 @@ class LogoutView(APIView):
     def post(self, request):
         logout(request)
         return Response({"detail": "Logged out successfully"}, status=status.HTTP_200_OK)
-    
