@@ -4,37 +4,46 @@ import api from './api';
 const AuthContext = createContext();
 
 export const AuthProvider = ({ children }) => {
-  const [user, setUser] = useState(null);
+  // Initialize state directly from localStorage if available
+  const [user, setUser] = useState(() => {
+    const savedUser = localStorage.getItem('app_user');
+    return savedUser ? JSON.parse(savedUser) : null;
+  });
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
+    // Verify session in background on reload
     api.get('me/')
-      .then(res => setUser(res.data))
-      .catch(() => setUser(null))
+      .then(res => {
+        setUser(res.data);
+        localStorage.setItem('app_user', JSON.stringify(res.data));
+      })
+      .catch(() => {
+        setUser(null);
+        localStorage.removeItem('app_user');
+      })
       .finally(() => setLoading(false));
   }, []);
 
   const login = async (username, password) => {
-    // Fetch CSRF token cookie from backend
     await api.get('csrf/'); 
-    
     const response = await api.post('login/', { username, password });
     setUser(response.data);
+    localStorage.setItem('app_user', JSON.stringify(response.data));
     return response.data;
   };
 
   const logout = async () => {
     try {
-      await api.get('csrf/'); // Fetches fresh CSRF token before post
       await api.post('logout/');
-    } catch (err) {
-      console.error(err);
+    } catch (e) {
+      console.error(e);
     } finally {
       setUser(null);
+      localStorage.removeItem('app_user');
     }
   };
 
-  
   return (
     <AuthContext.Provider value={{ user, login, logout, loading }}>
       {children}
