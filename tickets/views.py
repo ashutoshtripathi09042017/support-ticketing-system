@@ -1,13 +1,18 @@
 import csv
+import json
 from datetime import timedelta
 from django.utils import timezone
 from django.utils.decorators import method_decorator
 from django.http import HttpResponse, JsonResponse
 from django.db import models
+from django.contrib.auth import authenticate, login, logout
+from django.views.decorators.csrf import csrf_exempt, ensure_csrf_cookie
+
 from rest_framework import viewsets, status, generics
 from rest_framework.decorators import action, api_view, permission_classes
 from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated, AllowAny
+from rest_framework.views import APIView
 from django_filters.rest_framework import DjangoFilterBackend
 from rest_framework.filters import SearchFilter, OrderingFilter
 
@@ -16,17 +21,11 @@ from .serializers import (
     TicketSerializer, ReplySerializer, TicketHistorySerializer, 
     SlaAlertSerializer, UserSerializer
 )
-from .permissions import IsSupervisor, IsAssigneeOrCollaboratorOrSupervisor
-
-from django.contrib.auth import authenticate, login, logout
-from rest_framework.views import APIView
-from django.views.decorators.csrf import csrf_exempt, ensure_csrf_cookie
-import json
 
 
 class TicketViewSet(viewsets.ModelViewSet):
     serializer_class = TicketSerializer
-    permission_classes = [IsAuthenticated, IsAssigneeOrCollaboratorOrSupervisor]
+    permission_classes = [IsAuthenticated]
     filter_backends = [DjangoFilterBackend, SearchFilter, OrderingFilter]
     
     # Server-side Filtering & Search
@@ -39,6 +38,10 @@ class TicketViewSet(viewsets.ModelViewSet):
         user = self.request.user
         queryset = Ticket.objects.all()
         
+        # Superuser ya Supervisor ke liye sab access
+        if user.is_superuser or user.is_staff:
+            return queryset
+            
         # Agent rule: can only see assigned or collaborated tickets
         if hasattr(user, 'profile') and user.profile.role == 'AGENT':
             queryset = queryset.filter(
@@ -48,6 +51,7 @@ class TicketViewSet(viewsets.ModelViewSet):
         return queryset
 
     def perform_create(self, serializer):
+        # Auto-assign creator if not provided
         ticket = serializer.save()
         TicketHistory.objects.create(
             ticket=ticket,
@@ -60,7 +64,6 @@ class TicketViewSet(viewsets.ModelViewSet):
         partial = kwargs.pop('partial', False)
         instance = self.get_object()
         old_status = instance.status
-        old_assignee = instance.primary_assignee
         
         new_status = request.data.get('status', old_status)
         new_assignee_id = request.data.get('primary_assignee', None)
@@ -73,7 +76,7 @@ class TicketViewSet(viewsets.ModelViewSet):
                     status=status.HTTP_403_FORBIDDEN
                 )
 
-        # Rule 4: Closed Ticket Reopen Window Check (24 hours)
+        # Rule 2: Closed Ticket Reopen Window Check (24 hours)
         if old_status == 'CLOSED' and new_status != 'CLOSED':
             if instance.closed_at and (timezone.now() - instance.closed_at) > timedelta(hours=24):
                 return Response(
@@ -135,7 +138,6 @@ class TicketViewSet(viewsets.ModelViewSet):
 
     @action(detail=False, methods=['post'])
     def bulk_action(self, request):
-        """Bulk reassign or bulk close with per-item status report."""
         ticket_ids = request.data.get('ticket_ids', [])
         action_type = request.data.get('action') # 'reassign' or 'close'
         target_assignee_id = request.data.get('assignee_id')
@@ -227,7 +229,6 @@ class SlaAlertViewSet(viewsets.ModelViewSet):
 @api_view(['GET'])
 @permission_classes([AllowAny])
 def get_csrf_token(request):
-    """Sets CSRF cookie for cross-domain requests."""
     return Response({'detail': 'CSRF cookie set'})
 
 
@@ -274,7 +275,6 @@ class CurrentUserView(APIView):
 
 @method_decorator(csrf_exempt, name='dispatch')
 class LogoutView(APIView):
-
     def post(self, request):
         logout(request)
         return Response({"detail": "Logged out successfully"}, status=status.HTTP_200_OK)
