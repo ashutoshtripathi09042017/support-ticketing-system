@@ -15,6 +15,7 @@ from rest_framework.permissions import IsAuthenticated, AllowAny
 from rest_framework.views import APIView
 from django_filters.rest_framework import DjangoFilterBackend
 from rest_framework.filters import SearchFilter, OrderingFilter
+from rest_framework.authentication import SessionAuthentication
 
 from .models import Ticket, Reply, TicketHistory, SlaAlert, UserProfile
 from .serializers import (
@@ -22,8 +23,13 @@ from .serializers import (
     SlaAlertSerializer, UserSerializer
 )
 
+class CsrfExemptSessionAuthentication(SessionAuthentication):
+    def enforce_csrf(self, request):
+        return
+
 @method_decorator(csrf_exempt, name='dispatch')
 class TicketViewSet(viewsets.ModelViewSet):
+    authentication_classes = (CsrfExemptSessionAuthentication,)
     serializer_class = TicketSerializer
     permission_classes = [IsAuthenticated]
     filter_backends = [DjangoFilterBackend, SearchFilter, OrderingFilter]

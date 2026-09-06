@@ -17,9 +17,9 @@ The backend uses Django Session Authentication. Ensure both frontend (`http://lo
 
 | Role | Username / Email | Password |
 |------|------------------|----------|
-| **Supervisor** | `supervisor` | `Password123` |
-| **Support Agent 1** | `agent1` | `Password123` |
-| **Support Agent 2** | `agent2` | `Password123` |
+| **Supervisor** | `supervisor` | `Ashu@2228` |
+| **Support Agent 1** | `agent1` | `Ashu@2228` |
+| **Support Agent 2** | `agent2` | `Ashu@2228` |
 
 ## Stack
 
