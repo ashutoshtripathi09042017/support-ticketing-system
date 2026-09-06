@@ -23,6 +23,7 @@ function MainApp() {
   return (
     <div style={{ background: '#121212', minHeight: '100vh', color: '#fff' }}>
       <Navbar 
+        currentUser={user}
         activeTab={activeTab} 
         setActiveTab={(tab) => { 
           setActiveTab(tab); 
@@ -52,6 +53,7 @@ function MainApp() {
         {selectedTicketId && (
           <TicketDetail 
             ticketId={selectedTicketId} 
+            currentUser={user} 
             onClose={() => setSelectedTicketId(null)} 
             onRefresh={() => setRefreshTrigger(prev => prev + 1)} 
           />

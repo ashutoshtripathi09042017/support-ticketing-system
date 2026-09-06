@@ -1,30 +1,36 @@
 import React, { useState, useEffect } from 'react';
 import api from './api';
 
-export default function TicketDetail({ ticketId, currentUser, onClose, onRefresh }) {
+export default function TicketDetail({ ticketId, currentUser: propUser, onClose, onRefresh }) {
   const [ticket, setTicket] = useState(null);
   const [usersList, setUsersList] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [user, setUser] = useState(propUser || null);
   const [replyMessage, setReplyMessage] = useState('');
   const [isInternal, setIsInternal] = useState(false);
 
-  // GUARANTEED SUPERVISOR DETECTOR
-  // Checks role, superuser, staff, or if username contains 'supervisor' or 'admin'
-  const isSupervisor = Boolean(
-    currentUser?.is_superuser || 
-    currentUser?.is_staff ||
-    currentUser?.role?.toUpperCase() === 'SUPERVISOR' ||
-    currentUser?.role?.toUpperCase() === 'ADMIN' ||
-    currentUser?.username?.toLowerCase().includes('supervisor') ||
-    currentUser?.username?.toLowerCase().includes('admin')
-  );
-
+  // Load ticket, users list, and currentUser if not passed via props
   const fetchDetails = async () => {
     try {
+      setLoading(true);
+      
+      // 1. Fetch current user if missing
+      let activeUser = propUser;
+      if (!activeUser) {
+        try {
+          const userRes = await api.get('current-user/');
+          activeUser = userRes.data;
+          setUser(activeUser);
+        } catch (e) {
+          console.warn("Could not fetch current user directly", e);
+        }
+      }
+
+      // 2. Fetch ticket details
       const ticketRes = await api.get(`tickets/${ticketId}/`);
       setTicket(ticketRes.data);
 
-      // Fetch users list for dropdown options
+      // 3. Fetch all users for Assignee & Collaborator dropdowns
       const usersRes = await api.get('users/');
       setUsersList(usersRes.data);
     } catch (err) {
@@ -38,7 +44,17 @@ export default function TicketDetail({ ticketId, currentUser, onClose, onRefresh
     if (ticketId) fetchDetails();
   }, [ticketId]);
 
-  // Handle Primary Assignee Update
+  // Guaranteed Supervisor Determination
+  const isSupervisor = Boolean(
+    user?.is_superuser || 
+    user?.is_staff ||
+    user?.role?.toUpperCase() === 'SUPERVISOR' ||
+    user?.role?.toUpperCase() === 'ADMIN' ||
+    user?.username?.toLowerCase().includes('supervisor') ||
+    user?.username?.toLowerCase().includes('admin')
+  );
+
+  // Update Primary Assignee
   const handleAssigneeChange = async (e) => {
     const newAssigneeId = e.target.value ? parseInt(e.target.value) : null;
     try {
@@ -50,7 +66,7 @@ export default function TicketDetail({ ticketId, currentUser, onClose, onRefresh
     }
   };
 
-  // Handle Collaborators Update
+  // Update Collaborators
   const handleCollaboratorChange = async (e) => {
     const selectedOptions = Array.from(e.target.selectedOptions, option => parseInt(option.value)).filter(Boolean);
     try {
@@ -62,7 +78,7 @@ export default function TicketDetail({ ticketId, currentUser, onClose, onRefresh
     }
   };
 
-  // Handle Status Update
+  // Update Status
   const handleStatusChange = async (e) => {
     try {
       await api.patch(`tickets/${ticketId}/`, { status: e.target.value });
@@ -73,7 +89,7 @@ export default function TicketDetail({ ticketId, currentUser, onClose, onRefresh
     }
   };
 
-  // Handle Post Reply
+  // Post Reply
   const handlePostReply = async (e) => {
     e.preventDefault();
     if (!replyMessage.trim()) return;
@@ -90,7 +106,7 @@ export default function TicketDetail({ ticketId, currentUser, onClose, onRefresh
     }
   };
 
-  if (loading) return <div style={{ color: '#fff', padding: '20px' }}>Loading details...</div>;
+  if (loading) return <div style={{ color: '#fff', padding: '20px' }}>Loading ticket details...</div>;
   if (!ticket) return null;
 
   return (
@@ -112,7 +128,6 @@ export default function TicketDetail({ ticketId, currentUser, onClose, onRefresh
         <div>
           <label style={{ fontSize: '11px', color: '#aaa', display: 'block', marginBottom: '4px' }}>Assignee:</label>
           {isSupervisor ? (
-            /* Supervisor View: Select Dropdown */
             <select 
               value={ticket.primary_assignee || ''} 
               onChange={handleAssigneeChange}
@@ -124,7 +139,6 @@ export default function TicketDetail({ ticketId, currentUser, onClose, onRefresh
               ))}
             </select>
           ) : (
-            /* Agent View: Read-only */
             <div style={{ padding: '8px', background: '#2a2a2a', color: '#4dabf7', border: '1px solid #444', borderRadius: '4px', fontSize: '13px' }}>
               {ticket.primary_assignee_username || 'Unassigned'}
             </div>
@@ -183,7 +197,7 @@ export default function TicketDetail({ ticketId, currentUser, onClose, onRefresh
         )}
       </div>
 
-      {/* Post Reply */}
+      {/* Reply Form */}
       <form onSubmit={handlePostReply}>
         <textarea 
           rows="3" 
