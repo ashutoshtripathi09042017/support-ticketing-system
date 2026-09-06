@@ -112,7 +112,7 @@ export default function QueueView({ onSelectTicket }) {
 
       {/* Bulk Action Controls */}
       {selectedIds.length > 0 && (
-        <div style={{ background: '#e9ecef', padding: '10px', marginBottom: '15px', borderRadius: '4px' }}>
+        <div style={{ background: '#cad5e0', padding: '10px', marginBottom: '15px', borderRadius: '4px' }}>
           <span>Selected: {selectedIds.length} tickets | </span>
           <button onClick={handleBulkClose} style={{ marginLeft: '10px', background: '#dc3545', color: '#fff', border: 'none', padding: '5px 10px' }}>
             Bulk Close
@@ -138,7 +138,7 @@ export default function QueueView({ onSelectTicket }) {
       {loading ? <p>Loading tickets...</p> : (
         <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left' }}>
           <thead>
-            <tr style={{ background: '#f8f9fa', borderBottom: '2px solid #dee2e6' }}>
+            <tr style={{ background: '#0b0c0d', borderBottom: '2px solid #dee2e6' }}>
               <th style={{ padding: '8px' }}>
                 <input type="checkbox" onChange={handleSelectAll} checked={selectedIds.length === tickets.length && tickets.length > 0} />
               </th>
