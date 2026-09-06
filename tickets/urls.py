@@ -20,7 +20,7 @@ urlpatterns = [
     path('login/', login_view, name='login'),
     path('me/', CurrentUserView.as_view(), name='current-user'),
     path('logout/', LogoutView.as_view(), name='logout'),
-    path('tickets/metrics/', TicketMetricsView.as_view({'get': 'metrics'}), name='ticket-metrics'),
+    path('tickets/metrics/', TicketMetricsView.as_view(actions={'get': 'metrics'}), name='ticket-metrics'),
     
     # DRF Router Endpoints
     path('', include(router.urls)),
