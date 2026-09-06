@@ -1,21 +1,26 @@
 import React, { useState, useEffect } from 'react';
 import api from './api';
 
-export default function TicketDetail({ ticketId, onClose, onRefresh }) {
+export default function TicketDetail({ ticketId, currentUser, onClose, onRefresh }) {
   const [ticket, setTicket] = useState(null);
   const [usersList, setUsersList] = useState([]);
   const [loading, setLoading] = useState(true);
   const [replyMessage, setReplyMessage] = useState('');
   const [isInternal, setIsInternal] = useState(false);
 
+  // Check if logged in user is SUPERVISOR
+  const isSupervisor = currentUser?.role === 'SUPERVISOR' || currentUser?.is_superuser;
+
   const fetchDetails = async () => {
     try {
-      const [ticketRes, usersRes] = await Promise.all([
-        api.get(`tickets/${ticketId}/`),
-        api.get('users/')
-      ]);
+      const ticketRes = await api.get(`tickets/${ticketId}/`);
       setTicket(ticketRes.data);
-      setUsersList(usersRes.data);
+
+      // Only fetch user list if Supervisor (Agents don't need re-assignment controls)
+      if (isSupervisor) {
+        const usersRes = await api.get('users/');
+        setUsersList(usersRes.data);
+      }
     } catch (err) {
       console.error("Failed to load details", err);
     } finally {
@@ -27,8 +32,9 @@ export default function TicketDetail({ ticketId, onClose, onRefresh }) {
     if (ticketId) fetchDetails();
   }, [ticketId]);
 
-  // Primary Assignee Update
+  // Reassign Primary Assignee (Supervisor Only)
   const handleAssigneeChange = async (e) => {
+    if (!isSupervisor) return;
     const newAssigneeId = e.target.value ? parseInt(e.target.value) : null;
     try {
       await api.patch(`tickets/${ticketId}/`, { primary_assignee: newAssigneeId });
@@ -39,8 +45,9 @@ export default function TicketDetail({ ticketId, onClose, onRefresh }) {
     }
   };
 
-  // Collaborator Update (Supports Single/None selection or Multi-array)
+  // Update Collaborators (Supervisor Only)
   const handleCollaboratorChange = async (e) => {
+    if (!isSupervisor) return;
     const selectedOptions = Array.from(e.target.selectedOptions, option => parseInt(option.value)).filter(Boolean);
     try {
       await api.patch(`tickets/${ticketId}/`, { collaborators: selectedOptions });
@@ -51,7 +58,7 @@ export default function TicketDetail({ ticketId, onClose, onRefresh }) {
     }
   };
 
-  // Status Change
+  // Status Change (Both Agent & Supervisor)
   const handleStatusChange = async (e) => {
     try {
       await api.patch(`tickets/${ticketId}/`, { status: e.target.value });
@@ -62,7 +69,7 @@ export default function TicketDetail({ ticketId, onClose, onRefresh }) {
     }
   };
 
-  // Post Reply (Fixed endpoint: add_reply)
+  // Post Reply / Internal Note (Both Agent & Supervisor)
   const handlePostReply = async (e) => {
     e.preventDefault();
     if (!replyMessage.trim()) return;
@@ -94,20 +101,27 @@ export default function TicketDetail({ ticketId, onClose, onRefresh }) {
         {ticket.description}
       </div>
 
-      {/* Assignment Controls */}
+      {/* Control Panel */}
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px', marginBottom: '12px' }}>
         <div>
-          <label style={{ fontSize: '11px', color: '#aaa', display: 'block', marginBottom: '4px' }}>Primary Assignee:</label>
-          <select 
-            value={ticket.primary_assignee || ''} 
-            onChange={handleAssigneeChange}
-            style={{ width: '100%', padding: '8px', background: '#2a2a2a', color: '#fff', border: '1px solid #444', borderRadius: '4px' }}
-          >
-            <option value="">Unassigned (None)</option>
-            {usersList.map(u => (
-              <option key={u.id} value={u.id}>{u.username} ({u.role || 'AGENT'})</option>
-            ))}
-          </select>
+          <label style={{ fontSize: '11px', color: '#aaa', display: 'block', marginBottom: '4px' }}>Assignee:</label>
+          {isSupervisor ? (
+            <select 
+              value={ticket.primary_assignee || ''} 
+              onChange={handleAssigneeChange}
+              style={{ width: '100%', padding: '8px', background: '#2a2a2a', color: '#fff', border: '1px solid #444', borderRadius: '4px' }}
+            >
+              <option value="">Unassigned (None)</option>
+              {usersList.map(u => (
+                <option key={u.id} value={u.id}>{u.username} ({u.role || 'AGENT'})</option>
+              ))}
+            </select>
+          ) : (
+            /* Read-only Display for Agent */
+            <div style={{ padding: '8px', background: '#333', color: '#4dabf7', border: '1px solid #444', borderRadius: '4px', fontSize: '13px' }}>
+              {ticket.primary_assignee_username || 'Unassigned'}
+            </div>
+          )}
         </div>
 
         <div>
@@ -126,27 +140,29 @@ export default function TicketDetail({ ticketId, onClose, onRefresh }) {
         </div>
       </div>
 
-      {/* Collaborative Assignee Control (Optional / Multi-select) */}
-      <div style={{ marginBottom: '20px' }}>
-        <label style={{ fontSize: '11px', color: '#aaa', display: 'block', marginBottom: '4px' }}>
-          Collaborator(s): <span style={{ color: '#888' }}>(Hold Ctrl/Cmd to select multiple or select None)</span>
-        </label>
-        <select 
-          multiple
-          value={ticket.collaborators || []} 
-          onChange={handleCollaboratorChange}
-          style={{ width: '100%', padding: '8px', background: '#2a2a2a', color: '#fff', border: '1px solid #444', borderRadius: '4px', height: '80px' }}
-        >
-          <option value="">-- None --</option>
-          {usersList.map(u => (
-            <option key={u.id} value={u.id}>{u.username} ({u.role || 'AGENT'})</option>
-          ))}
-        </select>
-      </div>
+      {/* Collaborators Control: Visible/Editable ONLY to Supervisor */}
+      {isSupervisor && (
+        <div style={{ marginBottom: '20px' }}>
+          <label style={{ fontSize: '11px', color: '#aaa', display: 'block', marginBottom: '4px' }}>
+            Collaborators: <span style={{ color: '#888' }}>(Hold Ctrl to select multiple)</span>
+          </label>
+          <select 
+            multiple
+            value={ticket.collaborators || []} 
+            onChange={handleCollaboratorChange}
+            style={{ width: '100%', padding: '8px', background: '#2a2a2a', color: '#fff', border: '1px solid #444', borderRadius: '4px', height: '70px' }}
+          >
+            <option value="">-- None --</option>
+            {usersList.map(u => (
+              <option key={u.id} value={u.id}>{u.username} ({u.role || 'AGENT'})</option>
+            ))}
+          </select>
+        </div>
+      )}
 
       <hr style={{ borderColor: '#333', margin: '20px 0' }} />
 
-      {/* Conversation & Replies */}
+      {/* Conversation & Replies (Both Agent & Supervisor) */}
       <h4>Conversation & Replies</h4>
       <div style={{ maxHeight: '200px', overflowY: 'auto', marginBottom: '15px' }}>
         {ticket.replies && ticket.replies.length > 0 ? (
@@ -161,6 +177,7 @@ export default function TicketDetail({ ticketId, onClose, onRefresh }) {
         )}
       </div>
 
+      {/* Post Reply Form */}
       <form onSubmit={handlePostReply}>
         <textarea 
           rows="3" 

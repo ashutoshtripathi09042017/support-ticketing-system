@@ -28,6 +28,7 @@ class CsrfExemptSessionAuthentication(SessionAuthentication):
     def enforce_csrf(self, request):
         return
 
+
 # ----------------------------- User ViewSet -----------------------------
 class UserViewSet(viewsets.ReadOnlyModelViewSet):
     queryset = User.objects.all().order_by('username')
@@ -48,7 +49,7 @@ class TicketViewSet(viewsets.ModelViewSet):
     ordering_fields = ['created_at', 'priority', 'updated_at']
     ordering = ['-created_at']
 
-    # UPDATED GET_QUERYSET (Shows Primary Assignee OR Collaborator Tickets to Agent)
+    # GET_QUERYSET: Supervisor sees ALL, Agent sees ONLY Assigned/Collaborated
     def get_queryset(self):
         user = self.request.user
         queryset = Ticket.objects.all()
@@ -56,11 +57,11 @@ class TicketViewSet(viewsets.ModelViewSet):
         if not user.is_authenticated:
             return Ticket.objects.none()
 
-        # Superuser ya Supervisor: Can see ALL tickets
-        if user.is_superuser or user.is_staff or getattr(user, 'profile', None) and user.profile.role == 'SUPERVISOR':
+        # Superuser / Staff / Supervisor: Full Access
+        if user.is_superuser or user.is_staff or (hasattr(user, 'profile') and user.profile.role == 'SUPERVISOR'):
             return queryset
             
-        # Agent rule: can see assigned or collaborated tickets
+        # Agent rule: strictly assigned or collaborated tickets
         if hasattr(user, 'profile') and user.profile.role == 'AGENT':
             queryset = queryset.filter(
                 models.Q(primary_assignee=user) | models.Q(collaborators=user)
@@ -99,17 +100,23 @@ class TicketViewSet(viewsets.ModelViewSet):
         old_status = instance.status
         
         new_status = request.data.get('status', old_status)
-        new_assignee_id = request.data.get('primary_assignee', None)
         
-        # Rule 1: Agent cannot reassign primary assignee away from self
+        # Strictly enforce Agent Restrictions
         if hasattr(request.user, 'profile') and request.user.profile.role == 'AGENT':
-            if new_assignee_id and int(new_assignee_id) != request.user.id:
+            # 1. Agent cannot modify primary assignee
+            if 'primary_assignee' in request.data and str(request.data['primary_assignee']) != str(instance.primary_assignee_id or ''):
                 return Response(
-                    {"detail": "Agents cannot reassign tickets to other users."},
+                    {"detail": "Agents are not allowed to reassign tickets."},
+                    status=status.HTTP_403_FORBIDDEN
+                )
+            # 2. Agent cannot modify collaborators
+            if 'collaborators' in request.data:
+                return Response(
+                    {"detail": "Agents are not allowed to modify ticket collaborators."},
                     status=status.HTTP_403_FORBIDDEN
                 )
 
-        # Rule 2: Closed Ticket Reopen Window Check (24 hours)
+        # Closed Ticket Reopen Window Check (24 hours)
         if old_status == 'CLOSED' and new_status != 'CLOSED':
             if instance.closed_at and (timezone.now() - instance.closed_at) > timedelta(hours=24):
                 return Response(
@@ -202,6 +209,7 @@ class TicketViewSet(viewsets.ModelViewSet):
             try:
                 ticket = Ticket.objects.get(id=tid)
                 
+                # Check permission for Agent
                 if hasattr(request.user, 'profile') and request.user.profile.role == 'AGENT':
                     if ticket.primary_assignee != request.user and request.user not in ticket.collaborators.all():
                         failed.append({"id": tid, "reason": "Permission denied for this ticket."})
@@ -320,8 +328,12 @@ class CurrentUserView(APIView):
         })
 
 
+# Logout view with AllowAny to prevent 403 Forbidden errors
 @method_decorator(csrf_exempt, name='dispatch')
 class LogoutView(APIView):
+    permission_classes = [AllowAny]
+    authentication_classes = []
+
     def post(self, request):
         logout(request)
         return Response({"detail": "Logged out successfully"}, status=status.HTTP_200_OK)
