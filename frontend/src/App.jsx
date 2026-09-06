@@ -4,6 +4,7 @@ import Login from './Login';
 import Navbar from './Navbar';
 import QueueView from './QueueView';
 import TicketDetail from './TicketDetail';
+import Dashboard from './Dashboard';
 
 function MainApp() {
   const { user, loading } = useAuth();
@@ -21,10 +22,7 @@ function MainApp() {
         <QueueView key={refreshTrigger} onSelectTicket={(id) => setSelectedTicketId(id)} />
       )}
       {activeTab === 'dashboard' && (
-        <div style={{ padding: '20px' }}>
-          <h2>Dashboard</h2>
-          <p>Dashboard metrics and SLA charts view.</p>
-        </div>
+        <Dashboard />
       )}
 
       {selectedTicketId && (

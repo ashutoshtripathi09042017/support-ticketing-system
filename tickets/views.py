@@ -152,6 +152,34 @@ class TicketViewSet(viewsets.ModelViewSet):
 
         return Response(ReplySerializer(reply).data, status=status.HTTP_201_CREATED)
 
+    @action(detail=False, methods=['get'])
+    def metrics(self, request):
+        queryset = self.get_queryset()
+        
+        total_tickets = queryset.count()
+        open_tickets = queryset.filter(status='OPEN').count()
+        pending_tickets = queryset.filter(status='PENDING').count()
+        resolved_tickets = queryset.filter(status='RESOLVED').count()
+        closed_tickets = queryset.filter(status='CLOSED').count()
+        
+        # Priority breakdown
+        high_priority = queryset.filter(priority='HIGH').count()
+        medium_priority = queryset.filter(priority='MEDIUM').count()
+        low_priority = queryset.filter(priority='LOW').count()
+
+        return Response({
+            'total': total_tickets,
+            'open': open_tickets,
+            'pending': pending_tickets,
+            'resolved': resolved_tickets,
+            'closed': closed_tickets,
+            'priority': {
+                'high': high_priority,
+                'medium': medium_priority,
+                'low': low_priority,
+            }
+        }, status=status.HTTP_200_OK)
+
     @action(detail=False, methods=['post'])
     def bulk_action(self, request):
         ticket_ids = request.data.get('ticket_ids', [])

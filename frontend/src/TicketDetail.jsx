@@ -39,6 +39,7 @@ export default function TicketDetail({ ticketId, onClose, onRefresh }) {
   });
 };
 
+
   const handleAddReply = (e) => {
     e.preventDefault();
     if (!replyText.trim()) return;
