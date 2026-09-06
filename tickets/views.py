@@ -62,17 +62,24 @@ class TicketViewSet(viewsets.ModelViewSet):
         if not user.is_authenticated:
             return Ticket.objects.none()
 
+        role = getattr(getattr(user, 'profile', None), 'role', None)
+
         # Superuser / Staff / Supervisor: Full Access
-        if user.is_superuser or user.is_staff or (hasattr(user, 'profile') and user.profile.role == 'SUPERVISOR'):
+        # if user.is_superuser or user.is_staff or (hasattr(user, 'profile') and user.profile.role == 'SUPERVISOR'):
+        #     return queryset
+        if user.is_superuser or role == 'SUPERVISOR':
             return queryset
-            
+
         # Agent rule: strictly assigned or collaborated tickets
-        if hasattr(user, 'profile') and user.profile.role == 'AGENT':
-            queryset = queryset.filter(
-                models.Q(primary_assignee=user) | models.Q(collaborators=user)
-            ).distinct()
+        # if hasattr(user, 'profile') and user.profile.role == 'AGENT':
+        #     queryset = queryset.filter(
+        #         models.Q(primary_assignee=user) | models.Q(collaborators=user)
+        #     ).distinct()
             
-        return queryset
+        # return queryset
+        return queryset.filter(
+            models.Q(primary_assignee=user) | models.Q(collaborators=user)
+        ).distinct()
 
     def perform_create(self, serializer):
         ticket = serializer.save()
@@ -304,7 +311,10 @@ def login_view(request):
             
             if user is not None:
                 login(request, user)
-                role = user.profile.role if hasattr(user, 'profile') else 'SUPERVISOR'
+                
+                # Fetch role safely or default to 'AGENT' for safety
+                role = getattr(getattr(user, 'profile', None), 'role', 'AGENT')
+                
                 return JsonResponse({
                     'id': user.id,
                     'username': user.username,
@@ -351,7 +361,9 @@ class TicketMetricsView(APIView):
         user = request.user
         queryset = Ticket.objects.all()
 
-        if hasattr(user, 'profile') and user.profile.role == 'AGENT':
+        role = getattr(getattr(user, 'profile', None), 'role', None)
+
+        if not user.is_superuser and role != 'SUPERVISOR':
             queryset = queryset.filter(
                 models.Q(primary_assignee=user) | models.Q(collaborators=user)
             ).distinct()
@@ -368,3 +380,20 @@ class TicketMetricsView(APIView):
                 'low': queryset.filter(priority='LOW').count(),
             }
         }, status=status.HTTP_200_OK)
+        # if hasattr(user, 'profile') and user.profile.role == 'AGENT':
+        #     queryset = queryset.filter(
+        #         models.Q(primary_assignee=user) | models.Q(collaborators=user)
+        #     ).distinct()
+
+        # return Response({
+        #     'total': queryset.count(),
+        #     'open': queryset.filter(status='OPEN').count(),
+        #     'pending': queryset.filter(status='PENDING').count(),
+        #     'resolved': queryset.filter(status='RESOLVED').count(),
+        #     'closed': queryset.filter(status='CLOSED').count(),
+        #     'priority': {
+        #         'high': queryset.filter(priority='HIGH').count(),
+        #         'medium': queryset.filter(priority='MEDIUM').count(),
+        #         'low': queryset.filter(priority='LOW').count(),
+        #     }
+        # }, status=status.HTTP_200_OK)
