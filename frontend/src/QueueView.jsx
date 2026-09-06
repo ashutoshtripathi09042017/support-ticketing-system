@@ -1,93 +1,72 @@
 import React, { useState, useEffect } from 'react';
 import api from './api';
-import CreateTicketModal from './CreateTicketModal';
 
 export default function QueueView({ onSelectTicket }) {
   const [tickets, setTickets] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [search, setSearch] = useState('');
+  const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState('');
   const [priorityFilter, setPriorityFilter] = useState('');
-  const [selectedIds, setSelectedIds] = useState([]);
-  const [bulkActionResult, setBulkActionResult] = useState(null);
-  const [isCreateOpen, setIsCreateOpen] = useState(false);
 
-  const fetchTickets = () => {
-    setLoading(true);
-    let url = `tickets/?search=${search}`;
-    if (statusFilter) url += `&status=${statusFilter}`;
-    if (priorityFilter) url += `&priority=${priorityFilter}`;
-
-    api.get(url)
-      .then(res => {
-        // Safe check for DRF Pagination vs Plain Array
-        const data = Array.isArray(res.data) ? res.data : (res.data.results || []);
-        setTickets(data);
-      })
-      .catch(err => console.error(err))
-      .finally(() => setLoading(false));
+  const fetchTickets = async () => {
+    try {
+      setLoading(true);
+      const res = await api.get('tickets/');
+      setTickets(res.data);
+    } catch (err) {
+      console.error("Failed to fetch tickets", err);
+    } finally {
+      setLoading(false);
+    }
   };
 
   useEffect(() => {
     fetchTickets();
-  }, [search, statusFilter, priorityFilter]);
+  }, []);
 
-  const handleSelectAll = (e) => {
-    if (e.target.checked) {
-      setSelectedIds(tickets.map(t => t.id));
-    } else {
-      setSelectedIds([]);
+  // Safe Assignee Extractor
+  const getAssigneeName = (ticket) => {
+    if (ticket.primary_assignee_username) return ticket.primary_assignee_username;
+    if (ticket.assigned_to_username) return ticket.assigned_to_username;
+    if (typeof ticket.primary_assignee === 'object' && ticket.primary_assignee?.username) {
+      return ticket.primary_assignee.username;
     }
-  };
-
-  const handleSelectOne = (id) => {
-    if (selectedIds.includes(id)) {
-      setSelectedIds(selectedIds.filter(item => item !== id));
-    } else {
-      setSelectedIds([...selectedIds, id]);
+    if (typeof ticket.assigned_to === 'object' && ticket.assigned_to?.username) {
+      return ticket.assigned_to.username;
     }
+    if (typeof ticket.primary_assignee === 'string') return ticket.primary_assignee;
+    return 'Unassigned';
   };
 
-  const handleBulkClose = () => {
-    if (selectedIds.length === 0) return;
-    api.post('tickets/bulk_action/', { ticket_ids: selectedIds, action: 'close' })
-      .then(res => {
-        setBulkActionResult(res.data);
-        setSelectedIds([]);
-        fetchTickets();
-      });
-  };
+  // Filter Logic
+  const filteredTickets = tickets.filter(t => {
+    const matchesSearch = t.subject?.toLowerCase().includes(searchTerm.toLowerCase()) || 
+                          t.description?.toLowerCase().includes(searchTerm.toLowerCase());
+    const matchesStatus = statusFilter ? t.status === statusFilter : true;
+    const matchesPriority = priorityFilter ? t.priority === priorityFilter : true;
+    return matchesSearch && matchesStatus && matchesPriority;
+  });
 
-  const handleExportCSV = () => {
-    api.get('tickets/export_csv/', { responseType: 'blob' })
-      .then((res) => {
-        const url = window.URL.createObjectURL(new Blob([res.data]));
-        const link = document.createElement('a');
-        link.href = url;
-        link.setAttribute('download', 'tickets_export.csv');
-        document.body.appendChild(link);
-        link.click();
-        link.remove();
-      })
-      .catch((err) => console.error('CSV Export Error:', err));
-};
-
-
+  if (loading) return <div style={{ color: '#fff', padding: '20px' }}>Loading queue...</div>;
 
   return (
-    <div style={{ padding: '20px' }}>
-      <h2>Ticket Queue</h2>
+    <div style={{ maxWidth: '1100px', margin: '0 auto' }}>
+      <h2 style={{ textAlign: 'center', marginBottom: '20px' }}>Ticket Queue</h2>
 
-      {/* Search & Filter Controls */}
-      <div style={{ display: 'flex', gap: '10px', marginBottom: '15px' }}>
-        <input
-          type="text"
-          placeholder="Search subject or description..."
-          value={search}
-          onChange={(e) => setSearch(e.target.value)}
-          style={{ padding: '8px', flex: 1 }}
+      {/* Filters Bar */}
+      <div style={{ display: 'flex', gap: '10px', marginBottom: '20px' }}>
+        <input 
+          type="text" 
+          placeholder="Search subject or description..." 
+          value={searchTerm}
+          onChange={(e) => setSearchTerm(e.target.value)}
+          style={{ flex: 1, padding: '8px 12px', background: '#2a2a2a', border: '1px solid #444', color: '#fff', borderRadius: '4px' }}
         />
-        <select value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)} style={{ padding: '8px' }}>
+        <select 
+          value={statusFilter} 
+          onChange={(e) => setStatusFilter(e.target.value)}
+          style={{ padding: '8px', background: '#2a2a2a', color: '#fff', border: '1px solid #444', borderRadius: '4px' }}
+        >
           <option value="">All Statuses</option>
           <option value="NEW">New</option>
           <option value="OPEN">Open</option>
@@ -95,97 +74,65 @@ export default function QueueView({ onSelectTicket }) {
           <option value="RESOLVED">Resolved</option>
           <option value="CLOSED">Closed</option>
         </select>
-        <select value={priorityFilter} onChange={(e) => setPriorityFilter(e.target.value)} style={{ padding: '8px' }}>
+        <select 
+          value={priorityFilter} 
+          onChange={(e) => setPriorityFilter(e.target.value)}
+          style={{ padding: '8px', background: '#2a2a2a', color: '#fff', border: '1px solid #444', borderRadius: '4px' }}
+        >
           <option value="">All Priorities</option>
           <option value="LOW">Low</option>
           <option value="MEDIUM">Medium</option>
           <option value="HIGH">High</option>
           <option value="URGENT">Urgent</option>
         </select>
-        <button onClick={handleExportCSV} style={{ padding: '8px 15px', background: '#28a745', color: '#fff', border: 'none' }}>
-          Export CSV
-        </button>
-        <button onClick={() => setIsCreateOpen(true)} style={{ background: '#28a745', color: '#fff', padding: '8px 15px', border: 'none', borderRadius: '4px', cursor: 'pointer', marginRight: '10px' }}>
-          + New Ticket
-        </button>
       </div>
 
-      {/* Bulk Action Controls */}
-      {selectedIds.length > 0 && (
-        <div style={{ background: '#cad5e0', padding: '10px', marginBottom: '15px', borderRadius: '4px' }}>
-          <span>Selected: {selectedIds.length} tickets | </span>
-          <button onClick={handleBulkClose} style={{ marginLeft: '10px', background: '#dc3545', color: '#fff', border: 'none', padding: '5px 10px' }}>
-            Bulk Close
-          </button>
-        </div>
-      )}
+      {/* Ticket Table */}
+      <table style={{ width: '100%', borderCollapse: 'collapse', background: '#1e1e1e', color: '#fff', borderRadius: '6px', overflow: 'hidden' }}>
+        <thead>
+          <tr style={{ borderBottom: '2px solid #444', textAlign: 'left', background: '#252525' }}>
+            <th style={{ padding: '12px' }}>ID</th>
+            <th style={{ padding: '12px' }}>Subject</th>
+            <th style={{ padding: '12px' }}>Status</th>
+            <th style={{ padding: '12px' }}>Priority</th>
+            <th style={{ padding: '12px' }}>Assignee</th>
+            <th style={{ padding: '12px' }}>Actions</th>
+          </tr>
+        </thead>
+        <tbody>
+          {filteredTickets.map(ticket => (
+            <tr key={ticket.id} style={{ borderBottom: '1px solid #333' }}>
+              <td style={{ padding: '12px' }}>#{ticket.id}</td>
+              <td 
+                onClick={() => onSelectTicket(ticket.id)} 
+                style={{ padding: '12px', color: '#4dabf7', cursor: 'pointer', fontWeight: 'bold' }}
+              >
+                {ticket.subject}
+              </td>
+              <td style={{ padding: '12px' }}>
+                <span style={{ padding: '3px 8px', borderRadius: '4px', background: '#333', fontSize: '12px' }}>
+                  {ticket.status}
+                </span>
+              </td>
+              <td style={{ padding: '12px', fontWeight: 'bold' }}>{ticket.priority}</td>
+              
+              {/* Dynamic Assignee Column Fix */}
+              <td style={{ padding: '12px', color: getAssigneeName(ticket) === 'Unassigned' ? '#888' : '#20c997', fontWeight: '500' }}>
+                {getAssigneeName(ticket)}
+              </td>
 
-      {/* Bulk Action Report Display */}
-      {bulkActionResult && (
-        <div style={{ background: '#d4edda', padding: '10px', marginBottom: '15px', border: '1px solid #c3e6cb' }}>
-          <p style={{ margin: 0 }}>
-            <strong>Bulk Operation Completed:</strong> Succeeded: {bulkActionResult.succeeded.length}, Failed: {bulkActionResult.failed.length}
-          </p>
-          {bulkActionResult.failed.map(f => (
-            <p key={f.id} style={{ color: 'red', margin: '4px 0 0 0', fontSize: '12px' }}>
-              Ticket #{f.id}: {f.reason}
-            </p>
-          ))}
-        </div>
-      )}
-
-      {/* Queue Table */}
-      {loading ? <p>Loading tickets...</p> : (
-        <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left' }}>
-          <thead>
-            <tr style={{ background: '#0b0c0d', borderBottom: '2px solid #dee2e6' }}>
-              <th style={{ padding: '8px' }}>
-                <input type="checkbox" onChange={handleSelectAll} checked={selectedIds.length === tickets.length && tickets.length > 0} />
-              </th>
-              <th style={{ padding: '8px' }}>ID</th>
-              <th style={{ padding: '8px' }}>Subject</th>
-              <th style={{ padding: '8px' }}>Status</th>
-              <th style={{ padding: '8px' }}>Priority</th>
-              <th style={{ padding: '8px' }}>Assignee</th>
-              <th style={{ padding: '8px' }}>Actions</th>
+              <td style={{ padding: '12px' }}>
+                <button 
+                  onClick={() => onSelectTicket(ticket.id)}
+                  style={{ background: '#555', color: '#fff', border: 'none', padding: '5px 10px', borderRadius: '4px', cursor: 'pointer' }}
+                >
+                  View
+                </button>
+              </td>
             </tr>
-          </thead>
-          <tbody>
-            {tickets.map(t => (
-              <tr key={t.id} style={{ borderBottom: '1px solid #dee2e6' }}>
-                <td style={{ padding: '8px' }}>
-                  <input
-                    type="checkbox"
-                    checked={selectedIds.includes(t.id)}
-                    onChange={() => handleSelectOne(t.id)}
-                  />
-                </td>
-                <td style={{ padding: '8px' }}>#{t.id}</td>
-                <td style={{ padding: '8px', cursor: 'pointer', color: '#0056b3' }} onClick={() => onSelectTicket(t.id)}>
-                  <strong>{t.subject}</strong>
-                </td>
-                <td style={{ padding: '8px' }}>
-                  <span style={{ padding: '3px 8px', borderRadius: '4px', fontSize: '12px', background: t.status === 'PENDING' ? '#ffc107' : '#e2e3e5' }}>
-                    {t.status}
-                  </span>
-                </td>
-                <td style={{ padding: '8px' }}>{t.priority}</td>
-                <td style={{ padding: '8px' }}>{t.primary_assignee_name || 'Unassigned'}</td>
-                <td style={{ padding: '8px' }}>
-                  <button onClick={() => onSelectTicket(t.id)} style={{ padding: '4px 8px', fontSize: '12px' }}>
-                    View
-                  </button>
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      )}
-      <CreateTicketModal 
-      isOpen={isCreateOpen} 
-      onClose={() => setIsCreateOpen(false)} 
-      onTicketCreated={fetchTickets} 
-    />
+          ))}
+        </tbody>
+      </table>
     </div>
   );
 }
