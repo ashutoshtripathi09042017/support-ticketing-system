@@ -152,7 +152,7 @@ class TicketViewSet(viewsets.ModelViewSet):
 
         return Response(ReplySerializer(reply).data, status=status.HTTP_201_CREATED)
 
-    @action(detail=False, methods=['get'])
+    @action(detail=False, methods=['get'], url_path='metrics', url_name='metrics')
     def metrics(self, request):
         queryset = self.get_queryset()
         
