@@ -6,6 +6,7 @@ from django.utils.decorators import method_decorator
 from django.http import HttpResponse, JsonResponse
 from django.db import models
 from django.contrib.auth import authenticate, login, logout
+from django.contrib.auth.models import User
 from django.views.decorators.csrf import csrf_exempt, ensure_csrf_cookie
 
 from rest_framework import viewsets, status, generics
@@ -27,6 +28,14 @@ class CsrfExemptSessionAuthentication(SessionAuthentication):
     def enforce_csrf(self, request):
         return
 
+# ----------------------------- User ViewSet (Fixes 404 /api/users/) -----------------------------
+class UserViewSet(viewsets.ReadOnlyModelViewSet):
+    queryset = User.objects.all().order_by('username')
+    serializer_class = UserSerializer
+    permission_classes = [IsAuthenticated]
+
+
+# ----------------------------- Ticket ViewSet -----------------------------
 @method_decorator(csrf_exempt, name='dispatch')
 class TicketViewSet(viewsets.ModelViewSet):
     authentication_classes = (CsrfExemptSessionAuthentication, TokenAuthentication)
@@ -34,7 +43,6 @@ class TicketViewSet(viewsets.ModelViewSet):
     permission_classes = [IsAuthenticated]
     filter_backends = [DjangoFilterBackend, SearchFilter, OrderingFilter]
     
-    # Server-side Filtering & Search
     filterset_fields = ['status', 'priority', 'category', 'primary_assignee', 'is_archived']
     search_fields = ['subject', 'description']
     ordering_fields = ['created_at', 'priority', 'updated_at']
@@ -44,11 +52,11 @@ class TicketViewSet(viewsets.ModelViewSet):
         user = self.request.user
         queryset = Ticket.objects.all()
         
-        # Superuser ya Supervisor ke liye sab access
-        if user.is_superuser or user.is_staff:
+        # Superuser ya Supervisor
+        if user.is_superuser or user.is_staff or getattr(user.profile, 'role', '') == 'SUPERVISOR':
             return queryset
             
-        # Agent rule: can only see assigned or collaborated tickets
+        # Agent rule: can see assigned or collaborated tickets
         if hasattr(user, 'profile') and user.profile.role == 'AGENT':
             queryset = queryset.filter(
                 models.Q(primary_assignee=user) | models.Q(collaborators=user)
@@ -57,17 +65,30 @@ class TicketViewSet(viewsets.ModelViewSet):
         return queryset
 
     def perform_create(self, serializer):
-        # Auto-assign creator if not provided
         ticket = serializer.save()
         TicketHistory.objects.create(
             ticket=ticket,
-            actor=self.request.user,
+            actor=self.request.user if self.request.user.is_authenticated else None,
             action='TICKET_CREATED',
             new_value=ticket.status
         )
 
+    # Public Ticket Submission (No Login Required)
+    @action(detail=False, methods=['post'], permission_classes=[AllowAny], url_path='public')
+    def public_create(self, request):
+        serializer = self.get_serializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        ticket = serializer.save()
+        
+        TicketHistory.objects.create(
+            ticket=ticket,
+            actor=None,
+            action='TICKET_CREATED_PUBLIC',
+            new_value=ticket.status
+        )
+        return Response(serializer.data, status=status.HTTP_201_CREATED)
+
     def update(self, request, *args, **kwargs):
-        # Force partial update True for PUT as well as PATCH
         kwargs['partial'] = True
         
         instance = self.get_object()
@@ -104,7 +125,6 @@ class TicketViewSet(viewsets.ModelViewSet):
         if new_status == 'CLOSED' and old_status != 'CLOSED':
             instance.closed_at = timezone.now()
 
-        # Call serializer with partial=True directly
         serializer = self.get_serializer(instance, data=request.data, partial=True)
         serializer.is_valid(raise_exception=True)
         self.perform_update(serializer)
@@ -134,7 +154,6 @@ class TicketViewSet(viewsets.ModelViewSet):
             is_internal=is_internal
         )
 
-        # Auto transition from Pending -> Open on customer/agent response
         if ticket.status == 'PENDING':
             ticket.status = 'OPEN'
             if ticket.sla_paused_at:
@@ -142,7 +161,6 @@ class TicketViewSet(viewsets.ModelViewSet):
                 ticket.sla_paused_at = None
             ticket.save()
 
-        # Record in Immutable History
         TicketHistory.objects.create(
             ticket=ticket, 
             actor=request.user,
@@ -155,45 +173,31 @@ class TicketViewSet(viewsets.ModelViewSet):
     @action(detail=False, methods=['get'], url_path='metrics', url_name='metrics')
     def metrics(self, request):
         queryset = self.get_queryset()
-        
-        total_tickets = queryset.count()
-        open_tickets = queryset.filter(status='OPEN').count()
-        pending_tickets = queryset.filter(status='PENDING').count()
-        resolved_tickets = queryset.filter(status='RESOLVED').count()
-        closed_tickets = queryset.filter(status='CLOSED').count()
-        
-        # Priority breakdown
-        high_priority = queryset.filter(priority='HIGH').count()
-        medium_priority = queryset.filter(priority='MEDIUM').count()
-        low_priority = queryset.filter(priority='LOW').count()
-
         return Response({
-            'total': total_tickets,
-            'open': open_tickets,
-            'pending': pending_tickets,
-            'resolved': resolved_tickets,
-            'closed': closed_tickets,
+            'total': queryset.count(),
+            'open': queryset.filter(status='OPEN').count(),
+            'pending': queryset.filter(status='PENDING').count(),
+            'resolved': queryset.filter(status='RESOLVED').count(),
+            'closed': queryset.filter(status='CLOSED').count(),
             'priority': {
-                'high': high_priority,
-                'medium': medium_priority,
-                'low': low_priority,
+                'high': queryset.filter(priority='HIGH').count(),
+                'medium': queryset.filter(priority='MEDIUM').count(),
+                'low': queryset.filter(priority='LOW').count(),
             }
         }, status=status.HTTP_200_OK)
 
     @action(detail=False, methods=['post'])
     def bulk_action(self, request):
         ticket_ids = request.data.get('ticket_ids', [])
-        action_type = request.data.get('action') # 'reassign' or 'close'
+        action_type = request.data.get('action')
         target_assignee_id = request.data.get('assignee_id')
 
-        succeeded = []
-        failed = []
+        succeeded, failed = [], []
 
         for tid in ticket_ids:
             try:
                 ticket = Ticket.objects.get(id=tid)
                 
-                # Check permissions
                 if hasattr(request.user, 'profile') and request.user.profile.role == 'AGENT':
                     if ticket.primary_assignee != request.user and request.user not in ticket.collaborators.all():
                         failed.append({"id": tid, "reason": "Permission denied for this ticket."})
@@ -241,13 +245,8 @@ class TicketViewSet(viewsets.ModelViewSet):
         for ticket in queryset:
             assignee = ticket.primary_assignee.username if ticket.primary_assignee else 'Unassigned'
             writer.writerow([
-                ticket.id,
-                ticket.subject,
-                ticket.status,
-                ticket.priority,
-                ticket.category,
-                assignee,
-                ticket.created_at.strftime('%Y-%m-%d %H:%M:%S')
+                ticket.id, ticket.subject, ticket.status, ticket.priority, 
+                ticket.category, assignee, ticket.created_at.strftime('%Y-%m-%d %H:%M:%S')
             ])
 
         return response
@@ -323,11 +322,11 @@ class LogoutView(APIView):
         logout(request)
         return Response({"detail": "Logged out successfully"}, status=status.HTTP_200_OK)
 
+
 class TicketMetricsView(APIView):
     permission_classes = [IsAuthenticated]
 
     def get(self, request):
-        # Filtering basis on user role
         user = request.user
         queryset = Ticket.objects.all()
 

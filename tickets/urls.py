@@ -7,12 +7,14 @@ from .views import (
     CurrentUserView, 
     LogoutView, 
     get_csrf_token, 
-    TicketMetricsView
+    TicketMetricsView,
+    UserViewSet
 )
 
 router = DefaultRouter()
 router.register(r'tickets', TicketViewSet, basename='ticket')
 router.register(r'sla-alerts', SlaAlertViewSet, basename='sla-alert')
+router.register(r'users', UserViewSet, basename='user')
 
 urlpatterns = [
     # Auth & Helper Endpoints (Matching React Frontend Routes)
