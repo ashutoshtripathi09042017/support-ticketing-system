@@ -8,7 +8,6 @@ export default function TicketDetail({ ticketId, onClose, onRefresh }) {
   const [replyMessage, setReplyMessage] = useState('');
   const [isInternal, setIsInternal] = useState(false);
 
-  // 1. Fetch Ticket details and Users list for dropdown
   const fetchDetails = async () => {
     try {
       const [ticketRes, usersRes] = await Promise.all([
@@ -18,7 +17,7 @@ export default function TicketDetail({ ticketId, onClose, onRefresh }) {
       setTicket(ticketRes.data);
       setUsersList(usersRes.data);
     } catch (err) {
-      console.error("Failed to load ticket details", err);
+      console.error("Failed to load details", err);
     } finally {
       setLoading(false);
     }
@@ -28,7 +27,7 @@ export default function TicketDetail({ ticketId, onClose, onRefresh }) {
     if (ticketId) fetchDetails();
   }, [ticketId]);
 
-  // 2. Handle Reassignment
+  // Primary Assignee Update
   const handleAssigneeChange = async (e) => {
     const newAssigneeId = e.target.value ? parseInt(e.target.value) : null;
     try {
@@ -36,15 +35,26 @@ export default function TicketDetail({ ticketId, onClose, onRefresh }) {
       fetchDetails();
       if (onRefresh) onRefresh();
     } catch (err) {
-      alert("Failed to assign agent");
+      alert("Failed to update assignee");
     }
   };
 
-  // 3. Handle Status Transition
-  const handleStatusChange = async (e) => {
-    const newStatus = e.target.value;
+  // Collaborator Update (Supports Single/None selection or Multi-array)
+  const handleCollaboratorChange = async (e) => {
+    const selectedOptions = Array.from(e.target.selectedOptions, option => parseInt(option.value)).filter(Boolean);
     try {
-      await api.patch(`tickets/${ticketId}/`, { status: newStatus });
+      await api.patch(`tickets/${ticketId}/`, { collaborators: selectedOptions });
+      fetchDetails();
+      if (onRefresh) onRefresh();
+    } catch (err) {
+      alert("Failed to update collaborators");
+    }
+  };
+
+  // Status Change
+  const handleStatusChange = async (e) => {
+    try {
+      await api.patch(`tickets/${ticketId}/`, { status: e.target.value });
       fetchDetails();
       if (onRefresh) onRefresh();
     } catch (err) {
@@ -52,12 +62,12 @@ export default function TicketDetail({ ticketId, onClose, onRefresh }) {
     }
   };
 
-  // 4. Handle Reply
+  // Post Reply (Fixed endpoint: add_reply)
   const handlePostReply = async (e) => {
     e.preventDefault();
     if (!replyMessage.trim()) return;
     try {
-      await api.post(`tickets/${ticketId}/reply/`, {
+      await api.post(`tickets/${ticketId}/add_reply/`, {
         message: replyMessage,
         is_internal: isInternal
       });
@@ -84,16 +94,16 @@ export default function TicketDetail({ ticketId, onClose, onRefresh }) {
         {ticket.description}
       </div>
 
-      {/* Assignment & Status Dropdowns */}
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px', marginBottom: '20px' }}>
+      {/* Assignment Controls */}
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px', marginBottom: '12px' }}>
         <div>
-          <label style={{ fontSize: '12px', color: '#aaa', display: 'block', marginBottom: '4px' }}>Assignee:</label>
+          <label style={{ fontSize: '11px', color: '#aaa', display: 'block', marginBottom: '4px' }}>Primary Assignee:</label>
           <select 
             value={ticket.primary_assignee || ''} 
             onChange={handleAssigneeChange}
             style={{ width: '100%', padding: '8px', background: '#2a2a2a', color: '#fff', border: '1px solid #444', borderRadius: '4px' }}
           >
-            <option value="">Unassigned</option>
+            <option value="">Unassigned (None)</option>
             {usersList.map(u => (
               <option key={u.id} value={u.id}>{u.username} ({u.role || 'AGENT'})</option>
             ))}
@@ -101,7 +111,7 @@ export default function TicketDetail({ ticketId, onClose, onRefresh }) {
         </div>
 
         <div>
-          <label style={{ fontSize: '12px', color: '#aaa', display: 'block', marginBottom: '4px' }}>Status:</label>
+          <label style={{ fontSize: '11px', color: '#aaa', display: 'block', marginBottom: '4px' }}>Status:</label>
           <select 
             value={ticket.status} 
             onChange={handleStatusChange}
@@ -116,6 +126,24 @@ export default function TicketDetail({ ticketId, onClose, onRefresh }) {
         </div>
       </div>
 
+      {/* Collaborative Assignee Control (Optional / Multi-select) */}
+      <div style={{ marginBottom: '20px' }}>
+        <label style={{ fontSize: '11px', color: '#aaa', display: 'block', marginBottom: '4px' }}>
+          Collaborator(s): <span style={{ color: '#888' }}>(Hold Ctrl/Cmd to select multiple or select None)</span>
+        </label>
+        <select 
+          multiple
+          value={ticket.collaborators || []} 
+          onChange={handleCollaboratorChange}
+          style={{ width: '100%', padding: '8px', background: '#2a2a2a', color: '#fff', border: '1px solid #444', borderRadius: '4px', height: '80px' }}
+        >
+          <option value="">-- None --</option>
+          {usersList.map(u => (
+            <option key={u.id} value={u.id}>{u.username} ({u.role || 'AGENT'})</option>
+          ))}
+        </select>
+      </div>
+
       <hr style={{ borderColor: '#333', margin: '20px 0' }} />
 
       {/* Conversation & Replies */}
@@ -124,7 +152,7 @@ export default function TicketDetail({ ticketId, onClose, onRefresh }) {
         {ticket.replies && ticket.replies.length > 0 ? (
           ticket.replies.map(r => (
             <div key={r.id} style={{ background: r.is_internal ? '#3a2e1d' : '#2a2a2a', padding: '8px 12px', borderRadius: '4px', marginBottom: '8px', fontSize: '13px' }}>
-              <strong>{r.author_name}</strong> {r.is_internal && <span style={{ color: '#ffc107', fontSize: '10px' }}>[INTERNAL]</span>}:
+              <strong>{r.author_name}</strong> {r.is_internal && <span style={{ color: '#ffc107', fontSize: '10px' }}>[INTERNAL NOTE]</span>}:
               <p style={{ margin: '4px 0 0 0' }}>{r.message}</p>
             </div>
           ))

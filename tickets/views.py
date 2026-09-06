@@ -28,7 +28,7 @@ class CsrfExemptSessionAuthentication(SessionAuthentication):
     def enforce_csrf(self, request):
         return
 
-# ----------------------------- User ViewSet (Fixes 404 /api/users/) -----------------------------
+# ----------------------------- User ViewSet -----------------------------
 class UserViewSet(viewsets.ReadOnlyModelViewSet):
     queryset = User.objects.all().order_by('username')
     serializer_class = UserSerializer
@@ -48,12 +48,16 @@ class TicketViewSet(viewsets.ModelViewSet):
     ordering_fields = ['created_at', 'priority', 'updated_at']
     ordering = ['-created_at']
 
+    # UPDATED GET_QUERYSET (Shows Primary Assignee OR Collaborator Tickets to Agent)
     def get_queryset(self):
         user = self.request.user
         queryset = Ticket.objects.all()
         
-        # Superuser ya Supervisor
-        if user.is_superuser or user.is_staff or getattr(user.profile, 'role', '') == 'SUPERVISOR':
+        if not user.is_authenticated:
+            return Ticket.objects.none()
+
+        # Superuser ya Supervisor: Can see ALL tickets
+        if user.is_superuser or user.is_staff or getattr(user, 'profile', None) and user.profile.role == 'SUPERVISOR':
             return queryset
             
         # Agent rule: can see assigned or collaborated tickets
@@ -73,7 +77,7 @@ class TicketViewSet(viewsets.ModelViewSet):
             new_value=ticket.status
         )
 
-    # Public Ticket Submission (No Login Required)
+    # Public Ticket Submission
     @action(detail=False, methods=['post'], permission_classes=[AllowAny], url_path='public')
     def public_create(self, request):
         serializer = self.get_serializer(data=request.data)
@@ -97,7 +101,7 @@ class TicketViewSet(viewsets.ModelViewSet):
         new_status = request.data.get('status', old_status)
         new_assignee_id = request.data.get('primary_assignee', None)
         
-        # Rule 1: Agent cannot reassign away from self
+        # Rule 1: Agent cannot reassign primary assignee away from self
         if hasattr(request.user, 'profile') and request.user.profile.role == 'AGENT':
             if new_assignee_id and int(new_assignee_id) != request.user.id:
                 return Response(
