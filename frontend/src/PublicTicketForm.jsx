@@ -37,29 +37,35 @@ export default function PublicTicketForm({ onGoToLogin }) {
     }
   };
 
+  const handleLoginClick = () => {
+    if (onGoToLogin) {
+      onGoToLogin();
+    } else {
+      window.location.reload(); // Fallback reload
+    }
+  };
+
   return (
-    <div style={{ maxWidth: '600px', margin: '40px auto', padding: '25px', background: '#1e1e1e', color: '#fff', borderRadius: '8px', position: 'relative' }}>
+    <div style={{ maxWidth: '600px', margin: '40px auto', padding: '25px', background: '#1e1e1e', color: '#fff', borderRadius: '8px' }}>
       
-      {/* Top Header with Back to Login Button */}
+      {/* ALWAYS VISIBLE LOGIN LINK */}
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '15px' }}>
-        <h2 style={{ margin: 0 }}>Customer Support Portal</h2>
-        {onGoToLogin && (
-          <button 
-            type="button"
-            onClick={onGoToLogin}
-            style={{ 
-              background: 'transparent', 
-              color: '#4dabf7', 
-              border: 'none', 
-              cursor: 'pointer', 
-              textDecoration: 'underline',
-              fontSize: '14px',
-              fontWeight: '500'
-            }}
-          >
-            Agent / Supervisor Login →
-          </button>
-        )}
+        <h2 style={{ margin: 0, fontSize: '22px' }}>Customer Support Portal</h2>
+        <button 
+          type="button"
+          onClick={handleLoginClick}
+          style={{ 
+            background: 'transparent', 
+            color: '#4dabf7', 
+            border: 'none', 
+            cursor: 'pointer', 
+            textDecoration: 'underline',
+            fontSize: '14px',
+            fontWeight: '600'
+          }}
+        >
+          Agent Sign In →
+        </button>
       </div>
 
       <p style={{ color: '#aaa', fontSize: '14px', marginBottom: '20px' }}>
