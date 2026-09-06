@@ -6,7 +6,8 @@ from .views import (
     login_view, 
     CurrentUserView, 
     LogoutView, 
-    get_csrf_token
+    get_csrf_token, 
+    TicketMetricsView
 )
 
 router = DefaultRouter()
@@ -19,6 +20,7 @@ urlpatterns = [
     path('login/', login_view, name='login'),
     path('me/', CurrentUserView.as_view(), name='current-user'),
     path('logout/', LogoutView.as_view(), name='logout'),
+    path('tickets/metrics/', TicketMetricsView.as_view(), name='ticket-metrics'),
     
     # DRF Router Endpoints
     path('', include(router.urls)),

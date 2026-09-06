@@ -322,3 +322,29 @@ class LogoutView(APIView):
     def post(self, request):
         logout(request)
         return Response({"detail": "Logged out successfully"}, status=status.HTTP_200_OK)
+
+class TicketMetricsView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        # Filtering basis on user role
+        user = request.user
+        queryset = Ticket.objects.all()
+
+        if hasattr(user, 'profile') and user.profile.role == 'AGENT':
+            queryset = queryset.filter(
+                models.Q(primary_assignee=user) | models.Q(collaborators=user)
+            ).distinct()
+
+        return Response({
+            'total': queryset.count(),
+            'open': queryset.filter(status='OPEN').count(),
+            'pending': queryset.filter(status='PENDING').count(),
+            'resolved': queryset.filter(status='RESOLVED').count(),
+            'closed': queryset.filter(status='CLOSED').count(),
+            'priority': {
+                'high': queryset.filter(priority='HIGH').count(),
+                'medium': queryset.filter(priority='MEDIUM').count(),
+                'low': queryset.filter(priority='LOW').count(),
+            }
+        }, status=status.HTTP_200_OK)
