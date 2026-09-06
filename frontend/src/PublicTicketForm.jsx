@@ -1,110 +1,93 @@
 import React, { useState } from 'react';
 import api from './api';
 
-export default function PublicTicketForm({ onBackToLogin }) {
+export default function PublicTicketForm() {
   const [formData, setFormData] = useState({
+    email: '',
     subject: '',
     description: '',
-    requester_email: '',
     priority: 'MEDIUM',
-    category: 'GENERAL'
+    category: 'General Query'
   });
-  const [submittedId, setSubmittedId] = useState(null);
-  const [loading, setLoading] = useState(false);
+  const [success, setSuccess] = useState('');
   const [error, setError] = useState('');
+  const [submitting, setSubmitting] = useState(false);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    setLoading(true);
+    setSuccess('');
     setError('');
+    setSubmitting(true);
 
     try {
-      const res = await api.post('tickets/', formData);
-      setSubmittedId(res.data.id || res.data.ticket_id || '#Ref-Success');
+      // FIX: Standard '/tickets/' ki jagah Public Endpoint '/tickets/public/' call hoga
+      const res = await api.post('tickets/public/', formData);
+      setSuccess(`Ticket submitted successfully! Your Ticket ID is #${res.data.id}`);
+      setFormData({
+        email: '',
+        subject: '',
+        description: '',
+        priority: 'MEDIUM',
+        category: 'General Query'
+      });
     } catch (err) {
-      setError(err.response?.data?.detail || 'Failed to submit ticket. Please check your inputs.');
+      console.error(err);
+      setError(err.response?.data?.detail || 'Failed to submit ticket. Please try again.');
     } finally {
-      setLoading(false);
+      setSubmitting(false);
     }
   };
 
-  if (submittedId) {
-    return (
-      <div style={{ maxWidth: '500px', margin: '60px auto', padding: '30px', background: '#1e1e1e', borderRadius: '8px', color: '#fff', textAlign: 'center', border: '1px solid #28a745' }}>
-        <h2 style={{ color: '#28a745' }}>Ticket Submitted Successfully!</h2>
-        <p style={{ color: '#ccc' }}>Your request reference ID is <strong>#{submittedId}</strong>.</p>
-        <p style={{ fontSize: '14px', color: '#aaa' }}>Our support agents will review your request and get back to you at <strong>{formData.requester_email}</strong>.</p>
-        
-        <button 
-          onClick={() => { setSubmittedId(null); setFormData({ subject: '', description: '', requester_email: '', priority: 'MEDIUM', category: 'GENERAL' }); }}
-          style={{ marginTop: '20px', padding: '10px 20px', background: '#007bff', color: '#fff', border: 'none', borderRadius: '4px', cursor: 'pointer', marginRight: '10px' }}
-        >
-          Submit Another Request
-        </button>
-        
-        {onBackToLogin && (
-          <button 
-            onClick={onBackToLogin}
-            style={{ marginTop: '20px', padding: '10px 20px', background: '#444', color: '#fff', border: 'none', borderRadius: '4px', cursor: 'pointer' }}
-          >
-            Agent Login
-          </button>
-        )}
-      </div>
-    );
-  }
-
   return (
-    <div style={{ maxWidth: '500px', margin: '40px auto', padding: '30px', background: '#1e1e1e', borderRadius: '8px', color: '#fff', border: '1px solid #333' }}>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
-        <h2 style={{ margin: 0 }}>Customer Support Portal</h2>
-        {onBackToLogin && (
-          <button onClick={onBackToLogin} style={{ background: 'transparent', color: '#007bff', border: 'none', cursor: 'pointer', textDecoration: 'underline' }}>
-            Agent Sign In
-          </button>
-        )}
-      </div>
-      
-      <p style={{ color: '#aaa', fontSize: '14px', marginBottom: '20px' }}>Submit your query or issue below. No account required.</p>
+    <div style={{ maxWidth: '600px', margin: '40px auto', padding: '20px', background: '#1e1e1e', color: '#fff', borderRadius: '8px' }}>
+      <h2 style={{ textAlign: 'center' }}>Customer Support Portal</h2>
+      <p style={{ textAlign: 'center', color: '#aaa', fontSize: '14px', marginBottom: '20px' }}>
+        Submit your query or issue below. No account required.
+      </p>
 
-      {error && <div style={{ color: '#ff4d4d', background: 'rgba(255,77,77,0.1)', padding: '10px', borderRadius: '4px', marginBottom: '15px', fontSize: '14px' }}>{error}</div>}
+      {success && <div style={{ background: '#198754', color: '#fff', padding: '10px', borderRadius: '4px', marginBottom: '15px' }}>{success}</div>}
+      {error && <div style={{ background: '#dc3545', color: '#fff', padding: '10px', borderRadius: '4px', marginBottom: '15px' }}>{error}</div>}
 
       <form onSubmit={handleSubmit}>
         <div style={{ marginBottom: '15px' }}>
-          <label style={{ fontSize: '12px', color: '#aaa', display: 'block', marginBottom: '5px' }}>Your Email Address *</label>
+          <label style={{ display: 'block', marginBottom: '5px' }}>Your Email Address *</label>
           <input 
-            type="email" required value={formData.requester_email}
-            onChange={e => setFormData({...formData, requester_email: e.target.value})}
-            placeholder="name@example.com"
-            style={{ width: '100%', padding: '10px', background: '#2a2a2a', border: '1px solid #444', color: '#fff', borderRadius: '4px', boxSizing: 'border-box' }}
+            type="email" 
+            required 
+            value={formData.email} 
+            onChange={(e) => setFormData({ ...formData, email: e.target.value })}
+            style={{ width: '100%', padding: '10px', background: '#2a2a2a', border: '1px solid #444', color: '#fff', borderRadius: '4px' }}
           />
         </div>
 
         <div style={{ marginBottom: '15px' }}>
-          <label style={{ fontSize: '12px', color: '#aaa', display: 'block', marginBottom: '5px' }}>Subject / Problem Summary *</label>
+          <label style={{ display: 'block', marginBottom: '5px' }}>Subject / Problem Summary *</label>
           <input 
-            type="text" required value={formData.subject}
-            onChange={e => setFormData({...formData, subject: e.target.value})}
-            placeholder="Brief subject of your issue"
-            style={{ width: '100%', padding: '10px', background: '#2a2a2a', border: '1px solid #444', color: '#fff', borderRadius: '4px', boxSizing: 'border-box' }}
+            type="text" 
+            required 
+            value={formData.subject} 
+            onChange={(e) => setFormData({ ...formData, subject: e.target.value })}
+            style={{ width: '100%', padding: '10px', background: '#2a2a2a', border: '1px solid #444', color: '#fff', borderRadius: '4px' }}
           />
         </div>
 
         <div style={{ marginBottom: '15px' }}>
-          <label style={{ fontSize: '12px', color: '#aaa', display: 'block', marginBottom: '5px' }}>Description *</label>
+          <label style={{ display: 'block', marginBottom: '5px' }}>Description *</label>
           <textarea 
-            rows="4" required value={formData.description}
-            onChange={e => setFormData({...formData, description: e.target.value})}
-            placeholder="Please detail your question or issue..."
-            style={{ width: '100%', padding: '10px', background: '#2a2a2a', border: '1px solid #444', color: '#fff', borderRadius: '4px', boxSizing: 'border-box' }}
+            rows="4" 
+            required 
+            value={formData.description} 
+            onChange={(e) => setFormData({ ...formData, description: e.target.value })}
+            style={{ width: '100%', padding: '10px', background: '#2a2a2a', border: '1px solid #444', color: '#fff', borderRadius: '4px' }}
           />
         </div>
 
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '15px', marginBottom: '20px' }}>
-          <div>
-            <label style={{ fontSize: '12px', color: '#aaa', display: 'block', marginBottom: '5px' }}>Priority Level</label>
+        <div style={{ display: 'flex', gap: '10px', marginBottom: '20px' }}>
+          <div style={{ flex: 1 }}>
+            <label style={{ display: 'block', marginBottom: '5px' }}>Priority Level</label>
             <select 
-              value={formData.priority} onChange={e => setFormData({...formData, priority: e.target.value})}
+              value={formData.priority} 
+              onChange={(e) => setFormData({ ...formData, priority: e.target.value })}
               style={{ width: '100%', padding: '10px', background: '#2a2a2a', border: '1px solid #444', color: '#fff', borderRadius: '4px' }}
             >
               <option value="LOW">Low</option>
@@ -114,24 +97,27 @@ export default function PublicTicketForm({ onBackToLogin }) {
             </select>
           </div>
 
-          <div>
-            <label style={{ fontSize: '12px', color: '#aaa', display: 'block', marginBottom: '5px' }}>Category</label>
+          <div style={{ flex: 1 }}>
+            <label style={{ display: 'block', marginBottom: '5px' }}>Category</label>
             <select 
-              value={formData.category} onChange={e => setFormData({...formData, category: e.target.value})}
+              value={formData.category} 
+              onChange={(e) => setFormData({ ...formData, category: e.target.value })}
               style={{ width: '100%', padding: '10px', background: '#2a2a2a', border: '1px solid #444', color: '#fff', borderRadius: '4px' }}
             >
-              <option value="GENERAL">General Query</option>
-              <option value="TECHNICAL">Technical Bug</option>
-              <option value="BILLING">Billing Issue</option>
+              <option value="General Query">General Query</option>
+              <option value="Technical Issue">Technical Issue</option>
+              <option value="Billing">Billing</option>
+              <option value="Product Replacement">Product Replacement</option>
             </select>
           </div>
         </div>
 
         <button 
-          type="submit" disabled={loading}
-          style={{ width: '100%', padding: '12px', background: '#28a745', border: 'none', color: '#fff', borderRadius: '4px', fontWeight: 'bold', cursor: 'pointer' }}
+          type="submit" 
+          disabled={submitting}
+          style={{ width: '100%', padding: '12px', background: '#28a745', border: 'none', color: '#fff', fontWeight: 'bold', borderRadius: '4px', cursor: 'pointer' }}
         >
-          {loading ? 'Submitting...' : 'Submit Support Ticket'}
+          {submitting ? 'Submitting...' : 'Submit Support Ticket'}
         </button>
       </form>
     </div>

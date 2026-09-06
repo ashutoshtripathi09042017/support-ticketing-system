@@ -41,13 +41,18 @@ class UserViewSet(viewsets.ReadOnlyModelViewSet):
 class TicketViewSet(viewsets.ModelViewSet):
     authentication_classes = (CsrfExemptSessionAuthentication, TokenAuthentication)
     serializer_class = TicketSerializer
-    permission_classes = [IsAuthenticated]
     filter_backends = [DjangoFilterBackend, SearchFilter, OrderingFilter]
     
     filterset_fields = ['status', 'priority', 'category', 'primary_assignee', 'is_archived']
     search_fields = ['subject', 'description']
     ordering_fields = ['created_at', 'priority', 'updated_at']
     ordering = ['-created_at']
+
+    # Dynamic Permissions: Allow public submission without auth
+    def get_permissions(self):
+        if self.action in ['public_create', 'create']:
+            return [AllowAny()]
+        return [IsAuthenticated()]
 
     # GET_QUERYSET: Supervisor sees ALL, Agent sees ONLY Assigned/Collaborated
     def get_queryset(self):
@@ -78,18 +83,18 @@ class TicketViewSet(viewsets.ModelViewSet):
             new_value=ticket.status
         )
 
-    # Public Ticket Submission
-    @action(detail=False, methods=['post'], permission_classes=[AllowAny], url_path='public')
+    # Public Ticket Submission Route
+    @action(detail=False, methods=['post'], permission_classes=[AllowAny], authentication_classes=[], url_path='public')
     def public_create(self, request):
         serializer = self.get_serializer(data=request.data)
         serializer.is_valid(raise_exception=True)
-        ticket = serializer.save()
+        ticket = serializer.save(primary_assignee=None, status='NEW')
         
         TicketHistory.objects.create(
             ticket=ticket,
             actor=None,
             action='TICKET_CREATED_PUBLIC',
-            new_value=ticket.status
+            new_value='NEW'
         )
         return Response(serializer.data, status=status.HTTP_201_CREATED)
 
