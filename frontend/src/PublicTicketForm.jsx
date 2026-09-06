@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import api from './api';
 
-export default function PublicTicketForm() {
+export default function PublicTicketForm({ onGoToLogin }) {
   const [formData, setFormData] = useState({
     email: '',
     subject: '',
@@ -20,7 +20,6 @@ export default function PublicTicketForm() {
     setSubmitting(true);
 
     try {
-      // FIX: Standard '/tickets/' ki jagah Public Endpoint '/tickets/public/' call hoga
       const res = await api.post('tickets/public/', formData);
       setSuccess(`Ticket submitted successfully! Your Ticket ID is #${res.data.id}`);
       setFormData({
@@ -39,9 +38,31 @@ export default function PublicTicketForm() {
   };
 
   return (
-    <div style={{ maxWidth: '600px', margin: '40px auto', padding: '20px', background: '#1e1e1e', color: '#fff', borderRadius: '8px' }}>
-      <h2 style={{ textAlign: 'center' }}>Customer Support Portal</h2>
-      <p style={{ textAlign: 'center', color: '#aaa', fontSize: '14px', marginBottom: '20px' }}>
+    <div style={{ maxWidth: '600px', margin: '40px auto', padding: '25px', background: '#1e1e1e', color: '#fff', borderRadius: '8px', position: 'relative' }}>
+      
+      {/* Top Header with Back to Login Button */}
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '15px' }}>
+        <h2 style={{ margin: 0 }}>Customer Support Portal</h2>
+        {onGoToLogin && (
+          <button 
+            type="button"
+            onClick={onGoToLogin}
+            style={{ 
+              background: 'transparent', 
+              color: '#4dabf7', 
+              border: 'none', 
+              cursor: 'pointer', 
+              textDecoration: 'underline',
+              fontSize: '14px',
+              fontWeight: '500'
+            }}
+          >
+            Agent / Supervisor Login →
+          </button>
+        )}
+      </div>
+
+      <p style={{ color: '#aaa', fontSize: '14px', marginBottom: '20px' }}>
         Submit your query or issue below. No account required.
       </p>
 
@@ -56,7 +77,7 @@ export default function PublicTicketForm() {
             required 
             value={formData.email} 
             onChange={(e) => setFormData({ ...formData, email: e.target.value })}
-            style={{ width: '100%', padding: '10px', background: '#2a2a2a', border: '1px solid #444', color: '#fff', borderRadius: '4px' }}
+            style={{ width: '100%', padding: '10px', background: '#2a2a2a', border: '1px solid #444', color: '#fff', borderRadius: '4px', boxSizing: 'border-box' }}
           />
         </div>
 
@@ -67,7 +88,7 @@ export default function PublicTicketForm() {
             required 
             value={formData.subject} 
             onChange={(e) => setFormData({ ...formData, subject: e.target.value })}
-            style={{ width: '100%', padding: '10px', background: '#2a2a2a', border: '1px solid #444', color: '#fff', borderRadius: '4px' }}
+            style={{ width: '100%', padding: '10px', background: '#2a2a2a', border: '1px solid #444', color: '#fff', borderRadius: '4px', boxSizing: 'border-box' }}
           />
         </div>
 
@@ -78,7 +99,7 @@ export default function PublicTicketForm() {
             required 
             value={formData.description} 
             onChange={(e) => setFormData({ ...formData, description: e.target.value })}
-            style={{ width: '100%', padding: '10px', background: '#2a2a2a', border: '1px solid #444', color: '#fff', borderRadius: '4px' }}
+            style={{ width: '100%', padding: '10px', background: '#2a2a2a', border: '1px solid #444', color: '#fff', borderRadius: '4px', boxSizing: 'border-box' }}
           />
         </div>
 
