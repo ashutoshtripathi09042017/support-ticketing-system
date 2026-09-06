@@ -67,8 +67,9 @@ class TicketViewSet(viewsets.ModelViewSet):
         )
 
     def update(self, request, *args, **kwargs):
-        # Explicitly force partial update if partial flag is present or request method is PATCH
-        kwargs['partial'] = kwargs.pop('partial', True)
+        # Force partial update True for PUT as well as PATCH
+        kwargs['partial'] = True
+        
         instance = self.get_object()
         old_status = instance.status
         
@@ -103,7 +104,10 @@ class TicketViewSet(viewsets.ModelViewSet):
         if new_status == 'CLOSED' and old_status != 'CLOSED':
             instance.closed_at = timezone.now()
 
-        response = super().update(request, *args, **kwargs)
+        # Call serializer with partial=True directly
+        serializer = self.get_serializer(instance, data=request.data, partial=True)
+        serializer.is_valid(raise_exception=True)
+        self.perform_update(serializer)
         
         # Audit Logging
         if old_status != new_status:
@@ -112,7 +116,7 @@ class TicketViewSet(viewsets.ModelViewSet):
                 action='STATUS_CHANGE', old_value=old_status, new_value=new_status
             )
             
-        return response
+        return Response(serializer.data)
 
     @action(detail=True, methods=['post'], permission_classes=[IsAuthenticated])
     def add_reply(self, request, pk=None):
