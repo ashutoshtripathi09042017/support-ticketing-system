@@ -24,13 +24,17 @@ export default function TicketDetail({ ticketId, onClose, onRefresh }) {
   }, [ticketId]);
 
   const handleStatusChange = (newStatus) => {
-    api.patch(`tickets/${ticketId}/`, { status: newStatus })
-      .then(() => {
-        fetchTicketDetail();
-        if (onRefresh) onRefresh();
-      })
-      .catch(err => console.error("Error updating status:", err));
-  };
+  api.patch(`tickets/${ticketId}/`, { status: newStatus })
+    .then((res) => {
+      console.log("Status updated:", res.data);
+      fetchTicketDetail();
+      if (onRefresh) onRefresh();
+    })
+    .catch((err) => {
+      console.error("Error updating status detail:", err.response?.data);
+      alert("Status change failed: " + JSON.stringify(err.response?.data));
+    });
+};
 
   const handleAddReply = (e) => {
     e.preventDefault();

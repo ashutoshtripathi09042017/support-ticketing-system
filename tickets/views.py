@@ -15,7 +15,7 @@ from rest_framework.permissions import IsAuthenticated, AllowAny
 from rest_framework.views import APIView
 from django_filters.rest_framework import DjangoFilterBackend
 from rest_framework.filters import SearchFilter, OrderingFilter
-from rest_framework.authentication import SessionAuthentication
+from rest_framework.authentication import SessionAuthentication, TokenAuthentication
 
 from .models import Ticket, Reply, TicketHistory, SlaAlert, UserProfile
 from .serializers import (
@@ -29,7 +29,7 @@ class CsrfExemptSessionAuthentication(SessionAuthentication):
 
 @method_decorator(csrf_exempt, name='dispatch')
 class TicketViewSet(viewsets.ModelViewSet):
-    authentication_classes = (CsrfExemptSessionAuthentication,)
+    authentication_classes = (CsrfExemptSessionAuthentication, TokenAuthentication)
     serializer_class = TicketSerializer
     permission_classes = [IsAuthenticated]
     filter_backends = [DjangoFilterBackend, SearchFilter, OrderingFilter]
@@ -67,7 +67,8 @@ class TicketViewSet(viewsets.ModelViewSet):
         )
 
     def update(self, request, *args, **kwargs):
-        partial = kwargs.pop('partial', False)
+        # Explicitly force partial update if partial flag is present or request method is PATCH
+        kwargs['partial'] = kwargs.pop('partial', True)
         instance = self.get_object()
         old_status = instance.status
         
