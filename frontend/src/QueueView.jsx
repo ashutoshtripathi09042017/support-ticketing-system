@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import api from './api';
+import CreateTicketModal from './CreateTicketModal';
 
 export default function QueueView({ onSelectTicket }) {
   const [tickets, setTickets] = useState([]);
@@ -9,6 +10,7 @@ export default function QueueView({ onSelectTicket }) {
   const [priorityFilter, setPriorityFilter] = useState('');
   const [selectedIds, setSelectedIds] = useState([]);
   const [bulkActionResult, setBulkActionResult] = useState(null);
+  const [isCreateOpen, setIsCreateOpen] = useState(false);
 
   const fetchTickets = () => {
     setLoading(true);
@@ -103,6 +105,9 @@ export default function QueueView({ onSelectTicket }) {
         <button onClick={handleExportCSV} style={{ padding: '8px 15px', background: '#28a745', color: '#fff', border: 'none' }}>
           Export CSV
         </button>
+        <button onClick={() => setIsCreateOpen(true)} style={{ background: '#28a745', color: '#fff', padding: '8px 15px', border: 'none', borderRadius: '4px', cursor: 'pointer', marginRight: '10px' }}>
+          + New Ticket
+        </button>
       </div>
 
       {/* Bulk Action Controls */}
@@ -176,6 +181,11 @@ export default function QueueView({ onSelectTicket }) {
           </tbody>
         </table>
       )}
+      <CreateTicketModal 
+      isOpen={isCreateOpen} 
+      onClose={() => setIsCreateOpen(false)} 
+      onTicketCreated={fetchTickets} 
+    />
     </div>
   );
 }
